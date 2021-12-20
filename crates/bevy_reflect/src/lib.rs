@@ -370,4 +370,19 @@ mod tests {
             std::any::type_name::<TestTupleStruct>()
         );
     }
+
+    #[test]
+    fn box_dyn_reflect() {
+        #[derive(Reflect)]
+        struct Foo {
+            a: u32,
+        }
+
+        let boxed: Box<dyn Reflect> = Box::new(Foo { a: 1 });
+
+        assert_eq!(
+            boxed.type_name(),
+            "bevy_reflect::tests::box_dyn_reflect::Foo"
+        );
+    }
 }

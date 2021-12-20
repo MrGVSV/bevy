@@ -1,5 +1,9 @@
 use crate::{serde::Serializable, List, Map, Struct, Tuple, TupleStruct};
-use std::{any::Any, fmt::Debug};
+use std::{
+    any::Any,
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 pub use bevy_utils::AHasher as ReflectHasher;
 
@@ -84,5 +88,51 @@ impl dyn Reflect {
     #[inline]
     pub fn downcast_mut<T: Reflect>(&mut self) -> Option<&mut T> {
         self.any_mut().downcast_mut::<T>()
+    }
+}
+
+unsafe impl Reflect for Box<dyn Reflect> {
+    fn type_name(&self) -> &str {
+        self.deref().type_name()
+    }
+
+    fn any(&self) -> &dyn Any {
+        self.deref().any()
+    }
+
+    fn any_mut(&mut self) -> &mut dyn Any {
+        self.deref_mut().any_mut()
+    }
+
+    fn apply(&mut self, value: &dyn Reflect) {
+        self.deref_mut().apply(value)
+    }
+
+    fn set(&mut self, value: Box<dyn Reflect>) -> Result<(), Box<dyn Reflect>> {
+        self.deref_mut().set(value)
+    }
+
+    fn reflect_ref(&self) -> ReflectRef {
+        self.deref().reflect_ref()
+    }
+
+    fn reflect_mut(&mut self) -> ReflectMut {
+        self.deref_mut().reflect_mut()
+    }
+
+    fn clone_value(&self) -> Box<dyn Reflect> {
+        self.deref().clone_value()
+    }
+
+    fn reflect_hash(&self) -> Option<u64> {
+        self.deref().reflect_hash()
+    }
+
+    fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
+        self.deref().reflect_partial_eq(value)
+    }
+
+    fn serializable(&self) -> Option<Serializable> {
+        self.deref().serializable()
     }
 }
