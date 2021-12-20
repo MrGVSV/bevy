@@ -22,16 +22,18 @@ fn main() {
 /// Deriving `Reflect` implements the relevant reflection traits. In this case, it implements the
 /// `Reflect` trait and the `Struct` trait `derive(Reflect)` assumes that all fields also implement
 /// Reflect.
+/// `Box` will forward all reflect methods to its inner value
 #[derive(Reflect)]
 pub struct Foo {
     a: usize,
     nested: Bar,
+    boxed: Box<dyn Reflect>,
     #[reflect(ignore)]
     _ignored: NonReflectedValue,
 }
 
-/// This `Bar` type is used in the `nested` field on the `Test` type. We must derive `Reflect` here
-/// too (or ignore it)
+/// This `Bar` type is used in the `nested` and `boxed` fields on the `Test` type.
+/// We must derive `Reflect` here too (or ignore it)
 #[derive(Reflect)]
 pub struct Bar {
     b: usize,
@@ -46,6 +48,7 @@ fn setup(type_registry: Res<TypeRegistry>) {
         a: 1,
         _ignored: NonReflectedValue { _a: 10 },
         nested: Bar { b: 8 },
+        boxed: Box::new(Bar { b: 4 }),
     };
 
     // You can set field values like this. The type must match exactly or this will fail.
