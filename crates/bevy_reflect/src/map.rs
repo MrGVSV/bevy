@@ -2,7 +2,7 @@ use std::any::Any;
 
 use bevy_utils::{Entry, HashMap};
 
-use crate::{serde::Serializable, Reflect, ReflectMut, ReflectRef};
+use crate::{Reflect, ReflectMut, ReflectRef};
 
 /// An ordered mapping between [`Reflect`] values.
 ///
@@ -182,10 +182,6 @@ unsafe impl Reflect for DynamicMap {
 
     fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
         map_partial_eq(self, value)
-    }
-
-    fn serializable(&self) -> Option<Serializable> {
-        None
     }
 }
 

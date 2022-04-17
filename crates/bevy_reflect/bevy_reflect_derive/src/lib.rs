@@ -193,7 +193,6 @@ fn impl_struct(
     let field_indices = (0..field_count).collect::<Vec<usize>>();
 
     let hash_fn = reflect_attrs.get_hash_impl(bevy_reflect_path);
-    let serialize_fn = reflect_attrs.get_serialize_impl(bevy_reflect_path);
     let partial_eq_fn = match reflect_attrs.reflect_partial_eq {
         TraitImpl::NotImplemented => quote! {
             use #bevy_reflect_path::Struct;
@@ -306,10 +305,6 @@ fn impl_struct(
                 #bevy_reflect_path::ReflectMut::Struct(self)
             }
 
-            fn serializable(&self) -> Option<#bevy_reflect_path::serde::Serializable> {
-                #serialize_fn
-            }
-
             fn reflect_hash(&self) -> Option<u64> {
                 #hash_fn
             }
@@ -337,7 +332,6 @@ fn impl_tuple_struct(
     let field_indices = (0..field_count).collect::<Vec<usize>>();
 
     let hash_fn = reflect_attrs.get_hash_impl(bevy_reflect_path);
-    let serialize_fn = reflect_attrs.get_serialize_impl(bevy_reflect_path);
     let partial_eq_fn = match reflect_attrs.reflect_partial_eq {
         TraitImpl::NotImplemented => quote! {
             use #bevy_reflect_path::TupleStruct;
@@ -427,10 +421,6 @@ fn impl_tuple_struct(
                 #bevy_reflect_path::ReflectMut::TupleStruct(self)
             }
 
-            fn serializable(&self) -> Option<#bevy_reflect_path::serde::Serializable> {
-                #serialize_fn
-            }
-
             fn reflect_hash(&self) -> Option<u64> {
                 #hash_fn
             }
@@ -451,7 +441,6 @@ fn impl_value(
 ) -> TokenStream {
     let hash_fn = reflect_attrs.get_hash_impl(bevy_reflect_path);
     let partial_eq_fn = reflect_attrs.get_partial_eq_impl();
-    let serialize_fn = reflect_attrs.get_serialize_impl(bevy_reflect_path);
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     TokenStream::from(quote! {
@@ -509,10 +498,6 @@ fn impl_value(
 
             fn reflect_partial_eq(&self, value: &dyn #bevy_reflect_path::Reflect) -> Option<bool> {
                 #partial_eq_fn
-            }
-
-            fn serializable(&self) -> Option<#bevy_reflect_path::serde::Serializable> {
-                #serialize_fn
             }
         }
     })
@@ -579,7 +564,6 @@ pub fn impl_reflect_value(input: TokenStream) -> TokenStream {
 struct ReflectAttrs {
     reflect_hash: TraitImpl,
     reflect_partial_eq: TraitImpl,
-    serialize: TraitImpl,
     data: Vec<Ident>,
 }
 
@@ -596,7 +580,6 @@ impl ReflectAttrs {
                             match ident.as_str() {
                                 "PartialEq" => attrs.reflect_partial_eq = TraitImpl::Implemented,
                                 "Hash" => attrs.reflect_hash = TraitImpl::Implemented,
-                                "Serialize" => attrs.serialize = TraitImpl::Implemented,
                                 _ => attrs.data.push(Ident::new(
                                     &format!("Reflect{}", segment.ident),
                                     Span::call_site(),
@@ -623,10 +606,6 @@ impl ReflectAttrs {
                                                 }
                                                 "Hash" => {
                                                     attrs.reflect_hash =
-                                                        TraitImpl::Custom(segment.ident.clone());
-                                                }
-                                                "Serialize" => {
-                                                    attrs.serialize =
                                                         TraitImpl::Custom(segment.ident.clone());
                                                 }
                                                 _ => {}
@@ -678,20 +657,6 @@ impl ReflectAttrs {
             },
             TraitImpl::Custom(impl_fn) => quote! {
                 Some(#impl_fn(self, value))
-            },
-            TraitImpl::NotImplemented => quote! {
-                None
-            },
-        }
-    }
-
-    fn get_serialize_impl(&self, path: &Path) -> proc_macro2::TokenStream {
-        match &self.serialize {
-            TraitImpl::Implemented => quote! {
-                Some(#path::serde::Serializable::Borrowed(self))
-            },
-            TraitImpl::Custom(impl_fn) => quote! {
-                Some(#impl_fn(self))
             },
             TraitImpl::NotImplemented => quote! {
                 None

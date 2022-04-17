@@ -1,7 +1,7 @@
 use smallvec::{Array, SmallVec};
 use std::any::Any;
 
-use crate::{serde::Serializable, FromReflect, List, ListIter, Reflect, ReflectMut, ReflectRef};
+use crate::{FromReflect, List, ListIter, Reflect, ReflectMut, ReflectRef};
 
 impl<T: Array + Send + Sync + 'static> List for SmallVec<T>
 where
@@ -91,10 +91,6 @@ where
 
     fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
         crate::list_partial_eq(self, value)
-    }
-
-    fn serializable(&self) -> Option<Serializable> {
-        None
     }
 }
 

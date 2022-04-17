@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use crate::{serde::Serializable, Reflect, ReflectMut, ReflectRef};
+use crate::{Reflect, ReflectMut, ReflectRef};
 
 /// An ordered, mutable list of [Reflect] items. This corresponds to types like [`std::vec::Vec`].
 pub trait List: Reflect {
@@ -153,10 +153,6 @@ unsafe impl Reflect for DynamicList {
 
     fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
         list_partial_eq(self, value)
-    }
-
-    fn serializable(&self) -> Option<Serializable> {
-        None
     }
 }
 

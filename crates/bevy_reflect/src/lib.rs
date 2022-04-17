@@ -352,14 +352,19 @@ mod tests {
             g: (1, vec![1, 2], Bar { x: 1 }),
         };
 
+        macro_rules! register {
+            ($type_registry:ident, $this_type:ty) => {
+                register_type!($type_registry, $this_type, erased_serde::Serialize)
+            };
+        }
         let mut registry = TypeRegistry::default();
-        registry.register::<u32>();
-        registry.register::<isize>();
-        registry.register::<usize>();
-        registry.register::<Bar>();
-        registry.register::<String>();
-        registry.register::<i8>();
-        registry.register::<i32>();
+        register!(registry, u32);
+        register!(registry, isize);
+        register!(registry, usize);
+        register!(registry, Bar);
+        register!(registry, String);
+        register!(registry, i8);
+        register!(registry, i32);
 
         let serializer = ReflectSerializer::new(&foo, &registry);
         let serialized = to_string_pretty(&serializer, PrettyConfig::default()).unwrap();

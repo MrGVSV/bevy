@@ -1,4 +1,4 @@
-use crate::{serde::Serializable, List, Map, Struct, Tuple, TupleStruct};
+use crate::{List, Map, Struct, Tuple, TupleStruct};
 use std::{any::Any, fmt::Debug};
 
 pub use bevy_utils::AHasher as ReflectHasher;
@@ -128,11 +128,6 @@ pub unsafe trait Reflect: Any + Send + Sync {
     ///
     /// If the underlying type does not support equality testing, returns `None`.
     fn reflect_partial_eq(&self, _value: &dyn Reflect) -> Option<bool>;
-
-    /// Returns a serializable version of the value.
-    ///
-    /// If the underlying type does not support serialization, returns `None`.
-    fn serializable(&self) -> Option<Serializable>;
 }
 
 /// A trait for types which can be constructed from a reflected type.

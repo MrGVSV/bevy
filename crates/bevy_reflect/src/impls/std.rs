@@ -1,13 +1,12 @@
 use crate as bevy_reflect;
 use crate::{
-    map_partial_eq, serde::Serializable, DynamicMap, FromReflect, FromType, GetTypeRegistration,
-    List, ListIter, Map, MapIter, Reflect, ReflectDeserialize, ReflectMut, ReflectRef,
-    TypeRegistration,
+    map_partial_eq, DynamicMap, FromReflect, FromType, GetTypeRegistration, List, ListIter, Map,
+    MapIter, Reflect, ReflectDeserialize, ReflectMut, ReflectRef, TypeRegistration,
 };
 
 use bevy_reflect_derive::{impl_from_reflect_value, impl_reflect_value};
 use bevy_utils::{Duration, HashMap, HashSet};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{
     any::Any,
     borrow::Cow,
@@ -15,26 +14,26 @@ use std::{
     ops::Range,
 };
 
-impl_reflect_value!(bool(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(u8(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(u16(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(u32(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(u64(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(u128(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(usize(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(i8(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(i16(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(i32(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(i64(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(i128(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(isize(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(f32(Serialize, Deserialize));
-impl_reflect_value!(f64(Serialize, Deserialize));
-impl_reflect_value!(String(Hash, PartialEq, Serialize, Deserialize));
-impl_reflect_value!(Option<T: Serialize + Clone + for<'de> Deserialize<'de> + Reflect + 'static>(Serialize, Deserialize));
-impl_reflect_value!(HashSet<T: Serialize + Hash + Eq + Clone + for<'de> Deserialize<'de> + Send + Sync + 'static>(Serialize, Deserialize));
-impl_reflect_value!(Range<T: Serialize + Clone + for<'de> Deserialize<'de> + Send + Sync + 'static>(Serialize, Deserialize));
-impl_reflect_value!(Duration(Hash, PartialEq, Serialize, Deserialize));
+impl_reflect_value!(bool(Hash, PartialEq, Deserialize));
+impl_reflect_value!(u8(Hash, PartialEq, Deserialize));
+impl_reflect_value!(u16(Hash, PartialEq, Deserialize));
+impl_reflect_value!(u32(Hash, PartialEq, Deserialize));
+impl_reflect_value!(u64(Hash, PartialEq, Deserialize));
+impl_reflect_value!(u128(Hash, PartialEq, Deserialize));
+impl_reflect_value!(usize(Hash, PartialEq, Deserialize));
+impl_reflect_value!(i8(Hash, PartialEq, Deserialize));
+impl_reflect_value!(i16(Hash, PartialEq, Deserialize));
+impl_reflect_value!(i32(Hash, PartialEq, Deserialize));
+impl_reflect_value!(i64(Hash, PartialEq, Deserialize));
+impl_reflect_value!(i128(Hash, PartialEq, Deserialize));
+impl_reflect_value!(isize(Hash, PartialEq, Deserialize));
+impl_reflect_value!(f32(Deserialize));
+impl_reflect_value!(f64(Deserialize));
+impl_reflect_value!(String(Hash, PartialEq, Deserialize));
+impl_reflect_value!(Option<T: Clone + Reflect + 'static>());
+impl_reflect_value!(HashSet<T: Hash + Eq + Clone + Send + Sync + 'static>());
+impl_reflect_value!(Range<T: Clone + Send + Sync + 'static>());
+impl_reflect_value!(Duration(Hash, PartialEq, Deserialize));
 
 impl_from_reflect_value!(bool);
 impl_from_reflect_value!(u8);
@@ -52,15 +51,9 @@ impl_from_reflect_value!(isize);
 impl_from_reflect_value!(f32);
 impl_from_reflect_value!(f64);
 impl_from_reflect_value!(String);
-impl_from_reflect_value!(
-    Option<T: Serialize + Clone + for<'de> Deserialize<'de> + Reflect + 'static>
-);
-impl_from_reflect_value!(
-    HashSet<T: Serialize + Hash + Eq + Clone + for<'de> Deserialize<'de> + Send + Sync + 'static>
-);
-impl_from_reflect_value!(
-    Range<T: Serialize + Clone + for<'de> Deserialize<'de> + Send + Sync + 'static>
-);
+impl_from_reflect_value!(Option<T: Clone + Reflect + 'static>);
+impl_from_reflect_value!(HashSet<T: Hash + Eq + Clone + Send + Sync + 'static>);
+impl_from_reflect_value!(Range<T: Clone + Send + Sync + 'static>);
 impl_from_reflect_value!(Duration);
 
 impl<T: FromReflect> List for Vec<T> {
@@ -137,10 +130,6 @@ unsafe impl<T: FromReflect> Reflect for Vec<T> {
 
     fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
         crate::list_partial_eq(self, value)
-    }
-
-    fn serializable(&self) -> Option<Serializable> {
-        None
     }
 }
 
@@ -256,10 +245,6 @@ unsafe impl<K: Reflect + Eq + Hash, V: Reflect> Reflect for HashMap<K, V> {
     fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
         map_partial_eq(self, value)
     }
-
-    fn serializable(&self) -> Option<Serializable> {
-        None
-    }
 }
 
 impl<K, V> GetTypeRegistration for HashMap<K, V>
@@ -345,10 +330,6 @@ unsafe impl Reflect for Cow<'static, str> {
             Some(false)
         }
     }
-
-    fn serializable(&self) -> Option<Serializable> {
-        Some(Serializable::Borrowed(self))
-    }
 }
 
 impl GetTypeRegistration for Cow<'static, str> {
@@ -367,10 +348,17 @@ impl FromReflect for Cow<'static, str> {
 
 #[cfg(test)]
 mod tests {
-    use crate::Reflect;
+    use crate::{serde::is_serializable, TypeRegistry};
 
     #[test]
     fn can_serialize_duration() {
-        assert!(std::time::Duration::ZERO.serializable().is_some());
+        let mut registry = TypeRegistry::default();
+        macro_rules! register {
+            ($type_registry:ident, $this_type:ty) => {
+                crate::register_type!($type_registry, $this_type, erased_serde::Serialize)
+            };
+        }
+        register!(registry, std::time::Duration);
+        assert!(is_serializable(&registry, &std::time::Duration::ZERO));
     }
 }

@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use crate::{serde::Serializable, FromReflect, Reflect, ReflectMut, ReflectRef};
+use crate::{FromReflect, Reflect, ReflectMut, ReflectRef};
 
 /// A reflected Rust tuple.
 ///
@@ -253,10 +253,6 @@ unsafe impl Reflect for DynamicTuple {
     fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
         tuple_partial_eq(self, value)
     }
-
-    fn serializable(&self) -> Option<Serializable> {
-        None
-    }
 }
 
 /// Applies the elements of `b` to the corresponding elements of `a`.
@@ -393,10 +389,6 @@ macro_rules! impl_reflect_tuple {
 
             fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
                 crate::tuple_partial_eq(self, value)
-            }
-
-            fn serializable(&self) -> Option<Serializable> {
-                None
             }
         }
 
