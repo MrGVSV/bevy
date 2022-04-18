@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![doc = include_str ! ("../README.md")]
 
 mod list;
 mod map;
@@ -9,6 +9,7 @@ mod tuple;
 mod tuple_struct;
 mod type_registry;
 mod type_uuid;
+
 mod impls {
     #[cfg(feature = "glam")]
     mod glam;
@@ -24,6 +25,7 @@ mod impls {
 }
 
 pub mod serde;
+
 pub mod prelude {
     #[doc(hidden)]
     pub use crate::{
@@ -49,6 +51,7 @@ pub use erased_serde;
 #[cfg(test)]
 #[allow(clippy::blacklisted_name, clippy::approx_constant)]
 mod tests {
+    use std::any::TypeId;
     use ::serde::de::DeserializeSeed;
     use bevy_utils::HashMap;
     use ron::{
@@ -427,5 +430,37 @@ mod tests {
             dyn_tuple_struct.type_name(),
             std::any::type_name::<TestTupleStruct>()
         );
+    }
+
+    #[test]
+    fn register_all_types() {
+        #[derive(Reflect)]
+        struct Foo;
+        #[derive(Reflect)]
+        struct Bar;
+        #[derive(Reflect)]
+        struct Baz;
+
+        trait SomeTrait {}
+        trait NoneTrait {}
+
+        impl SomeTrait for Foo {}
+        impl SomeTrait for Bar {}
+
+        register_all! {
+            traits: [SomeTrait],
+            types: [Foo, Bar, Baz]
+        }
+
+        let mut registry = TypeRegistry::default();
+        register_types(&mut registry);
+
+        let ty = registry.get(TypeId::of::<Foo>()).unwrap();
+        assert!(ty.trait_cast::<dyn SomeTrait>(&Foo).is_some());
+        assert!(ty.trait_cast::<dyn NoneTrait>(&Foo).is_none());
+
+        let ty = registry.get(TypeId::of::<Baz>()).unwrap();
+        assert!(ty.trait_cast::<dyn SomeTrait>(&Baz).is_none());
+        assert!(ty.trait_cast::<dyn NoneTrait>(&Baz).is_none());
     }
 }
