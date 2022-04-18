@@ -2,8 +2,8 @@ extern crate proc_macro;
 
 mod from_reflect;
 mod reflect_trait;
-mod type_uuid;
 mod registration;
+mod type_uuid;
 
 use bevy_macro_utils::BevyManifest;
 use proc_macro::TokenStream;
@@ -53,17 +53,17 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
     let unit_struct_punctuated = Punctuated::new();
     let (fields, mut derive_type) = match &ast.data {
         Data::Struct(DataStruct {
-                         fields: Fields::Named(fields),
-                         ..
-                     }) => (&fields.named, DeriveType::Struct),
+            fields: Fields::Named(fields),
+            ..
+        }) => (&fields.named, DeriveType::Struct),
         Data::Struct(DataStruct {
-                         fields: Fields::Unnamed(fields),
-                         ..
-                     }) => (&fields.unnamed, DeriveType::TupleStruct),
+            fields: Fields::Unnamed(fields),
+            ..
+        }) => (&fields.unnamed, DeriveType::TupleStruct),
         Data::Struct(DataStruct {
-                         fields: Fields::Unit,
-                         ..
-                     }) => (&unit_struct_punctuated, DeriveType::UnitStruct),
+            fields: Fields::Unit,
+            ..
+        }) => (&unit_struct_punctuated, DeriveType::UnitStruct),
         _ => (&unit_struct_punctuated, DeriveType::Value),
     };
 
@@ -86,7 +86,7 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
                             }
                             Ok(())
                         })
-                            .expect("Invalid 'property' attribute format.");
+                        .expect("Invalid 'property' attribute format.");
 
                         attribute_args
                     }),
@@ -99,9 +99,9 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
         .filter(|(_field, attrs, _i)| {
             attrs.is_none()
                 || match attrs.as_ref().unwrap().ignore {
-                Some(ignore) => !ignore,
-                None => true,
-            }
+                    Some(ignore) => !ignore,
+                    None => true,
+                }
         })
         .map(|(f, _attr, i)| (*f, *i))
         .collect::<Vec<(&Field, usize)>>();
@@ -710,17 +710,17 @@ pub fn derive_from_reflect(input: TokenStream) -> TokenStream {
     let unit_struct_punctuated = Punctuated::new();
     let (fields, mut derive_type) = match &ast.data {
         Data::Struct(DataStruct {
-                         fields: Fields::Named(fields),
-                         ..
-                     }) => (&fields.named, DeriveType::Struct),
+            fields: Fields::Named(fields),
+            ..
+        }) => (&fields.named, DeriveType::Struct),
         Data::Struct(DataStruct {
-                         fields: Fields::Unnamed(fields),
-                         ..
-                     }) => (&fields.unnamed, DeriveType::TupleStruct),
+            fields: Fields::Unnamed(fields),
+            ..
+        }) => (&fields.unnamed, DeriveType::TupleStruct),
         Data::Struct(DataStruct {
-                         fields: Fields::Unit,
-                         ..
-                     }) => (&unit_struct_punctuated, DeriveType::UnitStruct),
+            fields: Fields::Unit,
+            ..
+        }) => (&unit_struct_punctuated, DeriveType::UnitStruct),
         _ => (&unit_struct_punctuated, DeriveType::Value),
     };
 
@@ -743,7 +743,7 @@ pub fn derive_from_reflect(input: TokenStream) -> TokenStream {
                             }
                             Ok(())
                         })
-                            .expect("Invalid 'property' attribute format.");
+                        .expect("Invalid 'property' attribute format.");
 
                         attribute_args
                     }),
@@ -756,9 +756,9 @@ pub fn derive_from_reflect(input: TokenStream) -> TokenStream {
         .filter(|(_field, attrs, _i)| {
             attrs.is_none()
                 || match attrs.as_ref().unwrap().ignore {
-                Some(ignore) => !ignore,
-                None => true,
-            }
+                    Some(ignore) => !ignore,
+                    None => true,
+                }
         })
         .map(|(f, _attr, i)| (*f, *i))
         .collect::<Vec<(&Field, usize)>>();
@@ -839,7 +839,7 @@ pub fn impl_from_reflect_value(input: TokenStream) -> TokenStream {
 ///     traits: [MyTrait],
 ///     types: [MyType, MyOtherType],
 /// }
-/// 
+///
 /// ```
 #[proc_macro]
 pub fn register_all(item: TokenStream) -> TokenStream {

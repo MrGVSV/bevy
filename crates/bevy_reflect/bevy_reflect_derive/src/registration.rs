@@ -1,10 +1,9 @@
+use bevy_macro_utils::BevyManifest;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{bracketed, parse_macro_input, Token, Type};
 use syn::punctuated::{Iter, Punctuated};
-use bevy_macro_utils::BevyManifest;
-
+use syn::{bracketed, parse_macro_input, Token, Type};
 
 pub fn register_all_internal(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as RegisterAllData);
@@ -95,7 +94,10 @@ impl Parse for RegisterAllData {
             // Optional trailing comma
             input.parse::<Option<Token![,]>>()?;
         } else {
-            return Err(syn::Error::new(input.span(), "expected either 'traits' or 'types' field"));
+            return Err(syn::Error::new(
+                input.span(),
+                "expected either 'traits' or 'types' field",
+            ));
         }
 
         Ok(Self {

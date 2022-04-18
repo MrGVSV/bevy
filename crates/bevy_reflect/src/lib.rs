@@ -51,13 +51,13 @@ pub use erased_serde;
 #[cfg(test)]
 #[allow(clippy::blacklisted_name, clippy::approx_constant)]
 mod tests {
-    use std::any::TypeId;
     use ::serde::de::DeserializeSeed;
     use bevy_utils::HashMap;
     use ron::{
         ser::{to_string_pretty, PrettyConfig},
         Deserializer,
     };
+    use std::any::TypeId;
 
     use super::*;
     use crate as bevy_reflect;
