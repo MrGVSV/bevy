@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::{Add, AddAssign, Mul, MulAssign};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Reflect, FromReflect)]
-#[reflect(PartialEq, Serialize, Deserialize)]
+#[reflect(PartialEq, Deserialize)]
 pub enum Color {
     /// sRGBA color
     Rgba {
