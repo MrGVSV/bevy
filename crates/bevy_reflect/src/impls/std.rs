@@ -2,9 +2,8 @@ use crate as bevy_reflect;
 use crate::{
     map_partial_eq, serde::Serializable, Array, ArrayInfo, ArrayIter, DynamicMap, Enum,
     FromReflect, FromType, GetTypeRegistration, List, ListInfo, Map, MapInfo, MapIter, Reflect,
-    ReflectDeserialize, ReflectMut, ReflectRef, StructVariantRef, TupleVariantMut, TupleVariantRef,
-    TypeInfo, TypeRegistration, Typed, ValueInfo, VariantFieldMut, VariantFieldRef, VariantMut,
-    VariantRef,
+    ReflectDeserialize, ReflectMut, ReflectRef, TypeInfo, TypeRegistration, Typed, ValueInfo,
+    VariantFieldIter, VariantType,
 };
 
 use crate::utility::{GenericTypeInfoCell, NonGenericTypeInfoCell};
@@ -555,31 +554,52 @@ impl<T: Reflect + Clone> GetTypeRegistration for Option<T> {
 }
 
 impl<T: Reflect + Clone> Enum for Option<T> {
-    fn variant(&self) -> VariantRef {
+    fn field(&self, _name: &str) -> Option<&dyn Reflect> {
+        None
+    }
+
+    fn field_at(&self, index: usize) -> Option<&dyn Reflect> {
         match self {
-            Some(value) => {
-                let field = VariantFieldRef::new(value);
-                VariantRef::Tuple(TupleVariantRef::new(vec![field]))
-            }
-            None => VariantRef::Unit,
+            Some(value) if index == 0 => Some(value),
+            _ => None,
         }
     }
 
-    fn variant_mut(&mut self) -> VariantMut {
+    fn field_mut(&mut self, _name: &str) -> Option<&mut dyn Reflect> {
+        None
+    }
+
+    fn field_at_mut(&mut self, index: usize) -> Option<&mut dyn Reflect> {
         match self {
-            Some(value) => {
-                let field = VariantFieldMut::new(value);
-                VariantMut::Tuple(TupleVariantMut::new(vec![field]))
-            }
-            None => VariantMut::Unit,
+            Some(value) if index == 0 => Some(value),
+            _ => None,
         }
     }
 
+    fn index_of(&self, _name: &str) -> Option<usize> {
+        None
+    }
+
+    fn iter_fields(&self) -> VariantFieldIter {
+        VariantFieldIter::new(self)
+    }
+
+    #[inline]
+    fn field_len(&self) -> usize {
+        1
+    }
+
+    #[inline]
     fn variant_name(&self) -> &str {
         match self {
             Some(..) => "Some",
             None => "None",
         }
+    }
+
+    #[inline]
+    fn variant_type(&self) -> VariantType {
+        VariantType::Tuple
     }
 }
 unsafe impl<T: Reflect + Clone> Reflect for Option<T> {
