@@ -289,7 +289,8 @@ pub(crate) fn impl_enum(
             }
         }
     });
-    for (wrapper_ident, wrapper_name, _variant_index, variant_with_fields_ident, fields) in struct_wrappers
+    for (wrapper_ident, wrapper_name, _variant_index, variant_with_fields_ident, fields) in
+        struct_wrappers
     {
         let mut field_names = Vec::new();
         let mut field_idents = Vec::new();
@@ -423,7 +424,8 @@ pub(crate) fn impl_enum(
             }
         }));
     }
-    for (wrapper_ident, wrapper_name, _variant_index, variant_with_fields_ident, fields) in tuple_wrappers
+    for (wrapper_ident, wrapper_name, _variant_index, variant_with_fields_ident, fields) in
+        tuple_wrappers
     {
         let mut field_names = Vec::new();
         let mut field_idents = Vec::new();
