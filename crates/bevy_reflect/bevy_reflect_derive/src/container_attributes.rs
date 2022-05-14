@@ -105,7 +105,7 @@ impl Default for TraitImpl {
 ///
 /// > __Note:__ Registering a custom function only works for special traits.
 ///
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct ReflectTraits {
     debug: TraitImpl,
     hash: TraitImpl,
