@@ -1,9 +1,9 @@
 use crate as bevy_reflect;
 use crate::{
-    map_partial_eq, serde::Serializable, Array, ArrayInfo, ArrayIter, DynamicMap, Enum,
+    map_partial_eq, serde::Serializable, Array, ArrayInfo, ArrayIter, DynamicMap, Enum, EnumInfo,
     FromReflect, FromType, GetTypeRegistration, List, ListInfo, Map, MapInfo, MapIter, Reflect,
-    ReflectDeserialize, ReflectMut, ReflectRef, TypeInfo, TypeRegistration, Typed, ValueInfo,
-    VariantFieldIter, VariantType,
+    ReflectDeserialize, ReflectMut, ReflectRef, TupleVariantInfo, TypeInfo, TypeRegistration,
+    Typed, UnitVariantInfo, UnnamedField, ValueInfo, VariantFieldIter, VariantInfo, VariantType,
 };
 
 use crate::utility::{GenericTypeInfoCell, NonGenericTypeInfoCell};
@@ -642,7 +642,7 @@ unsafe impl<T: Reflect + Clone> Reflect for Option<T> {
             *self = value.clone();
         } else {
             {
-                panic!("Enum is not {}.", &std::any::type_name::<Self>());
+                panic!("Enum is not a {}.", std::any::type_name::<Self>());
             };
         }
     }
@@ -683,8 +683,12 @@ impl<T: Reflect + Clone> Typed for Option<T> {
     fn type_info() -> &'static TypeInfo {
         static CELL: GenericTypeInfoCell = GenericTypeInfoCell::new();
         CELL.get_or_insert::<Self, _>(|| {
-            // TODO: Replace with EnumInfo
-            TypeInfo::Value(ValueInfo::new::<Self>())
+            let none_variant = VariantInfo::Unit(UnitVariantInfo::new_static("None"));
+            let some_variant = VariantInfo::Tuple(TupleVariantInfo::new_static(
+                "Some",
+                &[UnnamedField::new::<T>(0)],
+            ));
+            TypeInfo::Enum(EnumInfo::new::<Self>(&[none_variant, some_variant]))
         })
     }
 }
