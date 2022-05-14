@@ -1,9 +1,10 @@
 use crate as bevy_reflect;
 use crate::{
     map_partial_eq, serde::Serializable, Array, ArrayInfo, ArrayIter, DynamicMap, Enum,
-    EnumVariant, EnumVariantMut, FromReflect, FromType, GetTypeRegistration, List, ListInfo, Map,
-    MapInfo, MapIter, Reflect, ReflectDeserialize, ReflectMut, ReflectRef, TypeInfo,
-    TypeRegistration, Typed, ValueInfo,
+    FromReflect, FromType, GetTypeRegistration, List, ListInfo, Map,
+    MapInfo, MapIter, Reflect, ReflectDeserialize, ReflectMut, ReflectRef, StructVariantRef,
+    TupleVariantMut, TupleVariantRef, TypeInfo, TypeRegistration, Typed, ValueInfo,
+    VariantFieldMut, VariantFieldRef, VariantMut, VariantRef,
 };
 
 use crate::utility::{GenericTypeInfoCell, NonGenericTypeInfoCell};
@@ -554,17 +555,30 @@ impl<T: Reflect + Clone + Send + Sync + 'static> GetTypeRegistration for Option<
 }
 
 impl<T: Reflect + Clone + Send + Sync + 'static> Enum for Option<T> {
-    fn variant(&self) -> EnumVariant<'_> {
+    fn variant(&self) -> VariantRef {
         match self {
-            Option::Some(new_type) => EnumVariant::NewType(new_type as &dyn Reflect),
-            Option::None => EnumVariant::Unit,
+            Some(value) => {
+                let field = VariantFieldRef::new(value);
+                VariantRef::Tuple(TupleVariantRef::new(vec![field]))
+            }
+            None => VariantRef::Unit,
         }
     }
 
-    fn variant_mut(&mut self) -> EnumVariantMut<'_> {
+    fn variant_mut(&mut self) -> VariantMut {
         match self {
-            Option::Some(new_type) => EnumVariantMut::NewType(new_type as &mut dyn Reflect),
-            Option::None => EnumVariantMut::Unit,
+            Some(value) => {
+                let field = VariantFieldMut::new(value);
+                VariantMut::Tuple(TupleVariantMut::new(vec![field]))
+            }
+            None => VariantMut::Unit,
+        }
+    }
+
+    fn variant_name(&self) -> &str {
+        match self {
+            Some(..) => "Some",
+            None => "None",
         }
     }
 }
