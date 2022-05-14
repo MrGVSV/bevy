@@ -1,10 +1,10 @@
 use crate as bevy_reflect;
 use crate::{
     map_partial_eq, serde::Serializable, Array, ArrayInfo, ArrayIter, DynamicMap, Enum,
-    FromReflect, FromType, GetTypeRegistration, List, ListInfo, Map,
-    MapInfo, MapIter, Reflect, ReflectDeserialize, ReflectMut, ReflectRef, StructVariantRef,
-    TupleVariantMut, TupleVariantRef, TypeInfo, TypeRegistration, Typed, ValueInfo,
-    VariantFieldMut, VariantFieldRef, VariantMut, VariantRef,
+    FromReflect, FromType, GetTypeRegistration, List, ListInfo, Map, MapInfo, MapIter, Reflect,
+    ReflectDeserialize, ReflectMut, ReflectRef, StructVariantRef, TupleVariantMut, TupleVariantRef,
+    TypeInfo, TypeRegistration, Typed, ValueInfo, VariantFieldMut, VariantFieldRef, VariantMut,
+    VariantRef,
 };
 
 use crate::utility::{GenericTypeInfoCell, NonGenericTypeInfoCell};
@@ -548,13 +548,13 @@ unsafe impl Reflect for Cow<'static, str> {
     }
 }
 
-impl<T: Reflect + Clone + Send + Sync + 'static> GetTypeRegistration for Option<T> {
+impl<T: Reflect + Clone> GetTypeRegistration for Option<T> {
     fn get_type_registration() -> TypeRegistration {
         TypeRegistration::of::<Option<T>>()
     }
 }
 
-impl<T: Reflect + Clone + Send + Sync + 'static> Enum for Option<T> {
+impl<T: Reflect + Clone> Enum for Option<T> {
     fn variant(&self) -> VariantRef {
         match self {
             Some(value) => {
@@ -582,7 +582,7 @@ impl<T: Reflect + Clone + Send + Sync + 'static> Enum for Option<T> {
         }
     }
 }
-unsafe impl<T: Reflect + Clone + Send + Sync + 'static> Reflect for Option<T> {
+unsafe impl<T: Reflect + Clone> Reflect for Option<T> {
     #[inline]
     fn type_name(&self) -> &str {
         std::any::type_name::<Self>()
@@ -655,7 +655,7 @@ unsafe impl<T: Reflect + Clone + Send + Sync + 'static> Reflect for Option<T> {
     }
 }
 
-impl<T: Reflect + Clone + Send + Sync + 'static> Typed for Option<T> {
+impl<T: Reflect + Clone> Typed for Option<T> {
     fn type_info() -> &'static TypeInfo {
         static CELL: GenericTypeInfoCell = GenericTypeInfoCell::new();
         CELL.get_or_insert::<Self, _>(|| {
