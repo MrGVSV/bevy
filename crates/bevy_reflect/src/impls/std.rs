@@ -580,6 +580,10 @@ impl<T: Reflect + Clone> Enum for Option<T> {
         None
     }
 
+    fn name_at(&self, _index: usize) -> Option<&str> {
+        None
+    }
+
     fn iter_fields(&self) -> VariantFieldIter {
         VariantFieldIter::new(self)
     }
