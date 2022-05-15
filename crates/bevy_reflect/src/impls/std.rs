@@ -617,6 +617,7 @@ impl<T: Reflect + Clone> Enum for Option<T> {
         DynamicEnum::from_ref::<Self>(self)
     }
 }
+
 unsafe impl<T: Reflect + Clone> Reflect for Option<T> {
     #[inline]
     fn type_name(&self) -> &str {
