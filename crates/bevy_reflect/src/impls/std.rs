@@ -57,9 +57,6 @@ impl_from_reflect_value!(f32);
 impl_from_reflect_value!(f64);
 impl_from_reflect_value!(String);
 impl_from_reflect_value!(
-    Option<T: Serialize + Clone + for<'de> Deserialize<'de> + Reflect + 'static>
-);
-impl_from_reflect_value!(
     HashSet<T: Serialize + Hash + Eq + Clone + for<'de> Deserialize<'de> + Send + Sync + 'static>
 );
 impl_from_reflect_value!(
@@ -713,6 +710,36 @@ unsafe impl<T: Reflect + Clone> Reflect for Option<T> {
     }
 }
 
+impl<T: Reflect + Clone> FromReflect for Option<T> {
+    fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
+        if let ReflectRef::Enum(dyn_enum) = reflect.reflect_ref() {
+            match dyn_enum.variant_name() {
+                "Some" => {
+                    let field = dyn_enum
+                        .field_at(0)
+                        .expect("Field at index 0 should exist")
+                        .clone_value();
+                    let field = field.take::<T>().unwrap_or_else(|_| {
+                        panic!(
+                            "Field at index 0 should be of type {}",
+                            std::any::type_name::<T>()
+                        )
+                    });
+                    Some(Some(field))
+                }
+                "None" => Some(None),
+                name => panic!(
+                    "variant with name `{}` does not exist on enum `{}`",
+                    name,
+                    std::any::type_name::<Self>()
+                ),
+            }
+        } else {
+            None
+        }
+    }
+}
+
 impl<T: Reflect + Clone> Typed for Option<T> {
     fn type_info() -> &'static TypeInfo {
         static CELL: GenericTypeInfoCell = GenericTypeInfoCell::new();
@@ -750,7 +777,7 @@ impl FromReflect for Cow<'static, str> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Enum, Reflect, Typed, TypeInfo, VariantInfo, VariantType};
+    use crate::{Enum, Reflect, TypeInfo, Typed, VariantInfo, VariantType};
     use bevy_utils::HashMap;
     use std::f32::consts::{PI, TAU};
 
