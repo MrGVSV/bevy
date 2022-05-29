@@ -1,8 +1,10 @@
 use bevy_math::{DVec2, IVec2, Vec2};
+use bevy_reflect::{FromReflect, Reflect};
 use bevy_utils::{tracing::warn, Uuid};
 use raw_window_handle::RawWindowHandle;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Reflect, FromReflect)]
+#[reflect_value(PartialEq, Hash)]
 pub struct WindowId(Uuid);
 
 /// Presentation mode for a window.
