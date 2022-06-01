@@ -45,6 +45,10 @@ pub(crate) fn impl_enum(reflect_enum: &ReflectEnum) -> TokenStream {
         .meta()
         .traits()
         .get_serialize_impl(bevy_reflect_path);
+    let debug_fn = reflect_enum
+        .meta()
+        .traits()
+        .get_debug_impl();
     let partial_eq_fn = reflect_enum
         .meta()
         .traits()
@@ -239,6 +243,8 @@ pub(crate) fn impl_enum(reflect_enum: &ReflectEnum) -> TokenStream {
             #hash_fn
 
             #partial_eq_fn
+
+            #debug_fn
 
             #serialize_fn
         }
