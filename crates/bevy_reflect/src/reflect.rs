@@ -3,13 +3,41 @@ use crate::{
     tuple_struct_debug, Array, Enum, List, Map, Struct, Tuple, TupleStruct, TypeInfo, Typed,
     ValueInfo,
 };
+use std::fmt::{Display, Formatter};
 use std::{
     any::{self, Any, TypeId},
     fmt::Debug,
 };
 
+use crate::diff::{Diff, DiffError, DiffResult, DiffType};
 use crate::utility::NonGenericTypeInfoCell;
 pub use bevy_utils::AHasher as ReflectHasher;
+
+pub enum ReflectType {
+    Struct,
+    TupleStruct,
+    Tuple,
+    List,
+    Array,
+    Map,
+    Enum,
+    Value,
+}
+
+impl Display for ReflectType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Struct => write!(f, "struct"),
+            ReflectType::TupleStruct => write!(f, "tuple struct"),
+            ReflectType::Tuple => write!(f, "tuple"),
+            ReflectType::List => write!(f, "list"),
+            ReflectType::Array => write!(f, "array"),
+            ReflectType::Map => write!(f, "map"),
+            ReflectType::Enum => write!(f, "enum"),
+            ReflectType::Value => write!(f, "value"),
+        }
+    }
+}
 
 /// An immutable enumeration of "kinds" of reflected type.
 ///
@@ -147,6 +175,25 @@ pub trait Reflect: Any + Send + Sync {
     /// Implementors of other `Reflect` subtraits (e.g. [`List`], [`Map`]) should
     /// use those subtraits' respective `clone_dynamic` methods.
     fn clone_value(&self) -> Box<dyn Reflect>;
+
+    /// Compute the [diff](crate::diff::Diff) between this value and `other`.
+    ///
+    /// The computed diff should indicate how this value can be transformed into `other`.
+    ///
+    /// See the [module-level docs](crate::diff) for more details.
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        // Default implementation which should handle `ReflectRef::Value` types
+
+        if self.type_name() != other.type_name() {
+            return Ok(Diff::Replaced(other));
+        }
+
+        match self.reflect_partial_eq(other) {
+            Some(true) => Ok(Diff::NoChange),
+            Some(false) => Ok(Diff::Modified(DiffType::Value(other))),
+            None => Err(DiffError::Incomparable),
+        }
+    }
 
     /// Returns a hash of the value (which includes the type).
     ///

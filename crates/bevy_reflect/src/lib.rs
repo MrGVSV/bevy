@@ -30,6 +30,7 @@ mod impls {
     pub use self::std::*;
 }
 
+pub mod diff;
 mod enums;
 pub mod serde;
 pub mod std_traits;

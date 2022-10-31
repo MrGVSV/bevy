@@ -1,3 +1,4 @@
+use crate::diff::{diff_enum, DiffResult};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{
     enum_debug, enum_hash, enum_partial_eq, DynamicInfo, DynamicStruct, DynamicTuple, Enum,
@@ -393,6 +394,11 @@ impl Reflect for DynamicEnum {
     #[inline]
     fn clone_value(&self) -> Box<dyn Reflect> {
         Box::new(self.clone_dynamic())
+    }
+
+    #[inline]
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        diff_enum(self, other)
     }
 
     #[inline]

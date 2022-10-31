@@ -1,3 +1,4 @@
+use crate::diff::{diff_struct, DiffResult};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{DynamicInfo, NamedField, Reflect, ReflectMut, ReflectRef, TypeInfo, Typed};
 use bevy_utils::{Entry, HashMap};
@@ -406,6 +407,11 @@ impl Reflect for DynamicStruct {
     #[inline]
     fn clone_value(&self) -> Box<dyn Reflect> {
         Box::new(self.clone_dynamic())
+    }
+
+    #[inline]
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        diff_struct(self, other)
     }
 
     #[inline]

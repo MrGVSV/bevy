@@ -1,6 +1,7 @@
 use std::any::{Any, TypeId};
 use std::fmt::{Debug, Formatter};
 
+use crate::diff::{diff_list, DiffResult};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{
     Array, ArrayIter, DynamicArray, DynamicInfo, FromReflect, Reflect, ReflectMut, ReflectRef,
@@ -249,6 +250,11 @@ impl Reflect for DynamicList {
     #[inline]
     fn clone_value(&self) -> Box<dyn Reflect> {
         Box::new(List::clone_dynamic(self))
+    }
+
+    #[inline]
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        diff_list(self, other)
     }
 
     #[inline]

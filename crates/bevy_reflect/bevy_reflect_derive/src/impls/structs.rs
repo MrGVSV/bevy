@@ -197,6 +197,12 @@ pub(crate) fn impl_struct(reflect_struct: &ReflectStruct) -> TokenStream {
             fn clone_value(&self) -> Box<dyn #bevy_reflect_path::Reflect> {
                 Box::new(#bevy_reflect_path::Struct::clone_dynamic(self))
             }
+
+            #[inline]
+            fn diff<'new>(&self, other: &'new dyn #bevy_reflect_path::Reflect) -> #bevy_reflect_path::diff::DiffResult<'_, 'new> {
+                #bevy_reflect_path::diff::diff_struct(self, other)
+            }
+
             #[inline]
             fn set(&mut self, value: Box<dyn #bevy_reflect_path::Reflect>) -> Result<(), Box<dyn #bevy_reflect_path::Reflect>> {
                 *self = value.take()?;
