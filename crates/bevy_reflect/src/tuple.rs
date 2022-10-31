@@ -1,3 +1,4 @@
+use crate::diff::{diff_tuple, DiffResult};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{
     DynamicInfo, FromReflect, GetTypeRegistration, Reflect, ReflectMut, ReflectOwned, ReflectRef,
@@ -360,6 +361,10 @@ impl Reflect for DynamicTuple {
         Ok(())
     }
 
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        diff_tuple(self, other)
+    }
+
     fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
         tuple_partial_eq(self, value)
     }
@@ -560,6 +565,10 @@ macro_rules! impl_reflect_tuple {
 
             fn clone_value(&self) -> Box<dyn Reflect> {
                 Box::new(self.clone_dynamic())
+            }
+
+            fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+                diff_tuple(self, other)
             }
 
             fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {

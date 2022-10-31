@@ -1,3 +1,4 @@
+use crate::diff::{diff_tuple_struct, DiffResult};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{
     DynamicInfo, Reflect, ReflectMut, ReflectOwned, ReflectRef, TypeInfo, Typed, UnnamedField,
@@ -325,6 +326,11 @@ impl Reflect for DynamicTupleStruct {
     #[inline]
     fn clone_value(&self) -> Box<dyn Reflect> {
         Box::new(self.clone_dynamic())
+    }
+
+    #[inline]
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        diff_tuple_struct(self, other)
     }
 
     #[inline]

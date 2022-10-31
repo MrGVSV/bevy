@@ -8,6 +8,7 @@ use std::{
     fmt::Debug,
 };
 
+use crate::diff::{Diff, DiffError, DiffResult, DiffType};
 use crate::utility::NonGenericTypeInfoCell;
 pub use bevy_utils::AHasher as ReflectHasher;
 
@@ -172,6 +173,25 @@ pub trait Reflect: Any + Send + Sync {
     /// Implementors of other `Reflect` subtraits (e.g. [`List`], [`Map`]) should
     /// use those subtraits' respective `clone_dynamic` methods.
     fn clone_value(&self) -> Box<dyn Reflect>;
+
+    /// Compute the [diff](crate::diff::Diff) between this value and `other`.
+    ///
+    /// The computed diff should indicate how this value can be transformed into `other`.
+    ///
+    /// See the [module-level docs](crate::diff) for more details.
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        // Default implementation which should handle `ReflectRef::Value` types
+
+        if self.type_name() != other.type_name() {
+            return Ok(Diff::Replaced(other));
+        }
+
+        match self.reflect_partial_eq(other) {
+            Some(true) => Ok(Diff::NoChange),
+            Some(false) => Ok(Diff::Modified(DiffType::Value(other))),
+            None => Err(DiffError::Incomparable),
+        }
+    }
 
     /// Returns a hash of the value (which includes the type).
     ///

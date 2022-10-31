@@ -8,6 +8,7 @@ use crate::{
     VariantInfo, VariantType,
 };
 
+use crate::diff::{diff_array, diff_enum, diff_list, diff_map, DiffResult};
 use crate::utility::{GenericTypeInfoCell, NonGenericTypeInfoCell};
 use bevy_reflect_derive::{impl_from_reflect_value, impl_reflect_value};
 use bevy_utils::{Duration, Instant};
@@ -282,6 +283,10 @@ impl<T: FromReflect> Reflect for Vec<T> {
         Box::new(List::clone_dynamic(self))
     }
 
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        diff_list(self, other)
+    }
+
     fn reflect_hash(&self) -> Option<u64> {
         crate::array_hash(self)
     }
@@ -455,6 +460,10 @@ impl<K: FromReflect + Eq + Hash, V: FromReflect> Reflect for HashMap<K, V> {
         Box::new(self.clone_dynamic())
     }
 
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        diff_map(self, other)
+    }
+
     fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
         map_partial_eq(self, value)
     }
@@ -596,6 +605,11 @@ impl<T: Reflect, const N: usize> Reflect for [T; N] {
     #[inline]
     fn clone_value(&self) -> Box<dyn Reflect> {
         Box::new(self.clone_dynamic())
+    }
+
+    #[inline]
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        diff_array(self, other)
     }
 
     #[inline]
@@ -915,6 +929,11 @@ impl<T: FromReflect> Reflect for Option<T> {
     #[inline]
     fn clone_value(&self) -> Box<dyn Reflect> {
         Box::new(Enum::clone_dynamic(self))
+    }
+
+    #[inline]
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        diff_enum(self, other)
     }
 
     fn reflect_hash(&self) -> Option<u64> {
