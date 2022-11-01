@@ -7,7 +7,7 @@ use crate::{
     VariantInfo, VariantType,
 };
 
-use crate::diff::{diff_array, diff_enum, diff_list, diff_map, DiffResult};
+use crate::diff::{diff_array, diff_enum, diff_list, diff_map, diff_value, DiffResult};
 use crate::utility::{GenericTypeInfoCell, NonGenericTypeInfoCell};
 use bevy_reflect_derive::{impl_from_reflect_value, impl_reflect_value};
 use bevy_utils::{Duration, Instant};
@@ -630,6 +630,10 @@ impl Reflect for Cow<'static, str> {
 
     fn clone_value(&self) -> Box<dyn Reflect> {
         Box::new(self.clone())
+    }
+
+    fn diff<'new>(&self, other: &'new dyn Reflect) -> DiffResult<'_, 'new> {
+        diff_value(self, other)
     }
 
     fn reflect_hash(&self) -> Option<u64> {

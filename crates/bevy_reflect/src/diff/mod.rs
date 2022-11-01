@@ -120,6 +120,7 @@ mod map_diff;
 mod struct_diff;
 mod tuple_diff;
 mod tuple_struct_diff;
+mod value_diff;
 
 use crate::Reflect;
 pub use array_diff::*;
@@ -130,11 +131,14 @@ pub use map_diff::*;
 pub use struct_diff::*;
 pub use tuple_diff::*;
 pub use tuple_struct_diff::*;
+pub use value_diff::*;
 
 /// Indicates the difference between two [`Reflect`] objects.
 #[derive(Clone, Debug)]
 pub enum Diff<'old, 'new> {
     /// Indicates no change.
+    ///
+    /// Contains the "old" value.
     ///
     /// # Example
     ///
@@ -144,11 +148,13 @@ pub enum Diff<'old, 'new> {
     /// let new = 123;
     ///
     /// let diff = old.diff(&new).unwrap();
-    /// assert!(matches!(diff, Diff::NoChange));
+    /// assert!(matches!(diff, Diff::NoChange(_)));
     /// ```
     ///
-    NoChange,
+    NoChange(&'old dyn Reflect),
     /// Indicates that the type has been changed.
+    ///
+    /// Contains the "new" value.
     ///
     /// Note that for enums, this is also used when the variant has been changed.
     ///
@@ -214,7 +220,7 @@ mod tests {
         let new = 123_i32;
 
         let diff = old.diff(&new).unwrap();
-        assert!(matches!(diff, Diff::NoChange));
+        assert!(matches!(diff, Diff::NoChange(_)));
 
         let old = 123_i32;
         let new = 321_i32;
@@ -235,7 +241,7 @@ mod tests {
         let new = (1, 2, 3);
 
         let diff = old.diff(&new).unwrap();
-        assert!(matches!(diff, Diff::NoChange));
+        assert!(matches!(diff, Diff::NoChange(_)));
 
         let old = (1, 2, 3);
         let new = (1, 2, 3, 4);
@@ -251,12 +257,12 @@ mod tests {
             if let DiffType::Tuple(tuple_diff) = modified {
                 let mut fields = tuple_diff.field_iter();
 
-                assert!(matches!(fields.next(), Some(Diff::NoChange)));
+                assert!(matches!(fields.next(), Some(Diff::NoChange(_))));
                 assert!(matches!(
                     fields.next(),
                     Some(Diff::Modified(DiffType::Value(..)))
                 ));
-                assert!(matches!(fields.next(), Some(Diff::NoChange)));
+                assert!(matches!(fields.next(), Some(Diff::NoChange(_))));
                 assert!(matches!(fields.next(), None));
             } else {
                 panic!("expected `DiffType::Tuple`");
@@ -272,7 +278,7 @@ mod tests {
         let new = [1, 2, 3];
 
         let diff = old.diff(&new).unwrap();
-        assert!(matches!(diff, Diff::NoChange));
+        assert!(matches!(diff, Diff::NoChange(_)));
 
         let old = [1, 2, 3];
         let new = [1, 2, 3, 4];
@@ -288,12 +294,12 @@ mod tests {
             if let DiffType::Array(array_diff) = modified {
                 let mut fields = array_diff.iter();
 
-                assert!(matches!(fields.next(), Some(Diff::NoChange)));
+                assert!(matches!(fields.next(), Some(Diff::NoChange(_))));
                 assert!(matches!(
                     fields.next(),
                     Some(Diff::Modified(DiffType::Value(..)))
                 ));
-                assert!(matches!(fields.next(), Some(Diff::NoChange)));
+                assert!(matches!(fields.next(), Some(Diff::NoChange(_))));
                 assert!(matches!(fields.next(), None));
             } else {
                 panic!("expected `DiffType::Array`");
@@ -309,7 +315,7 @@ mod tests {
         let new = vec![1, 2, 3];
 
         let diff = old.diff(&new).unwrap();
-        assert!(matches!(diff, Diff::NoChange));
+        assert!(matches!(diff, Diff::NoChange(_)));
 
         let old: Vec<i32> = vec![1, 2, 3];
         let new: Vec<u32> = vec![1, 2, 3];
@@ -412,7 +418,7 @@ mod tests {
         let new = map! {3: 333, 1: 111, 2: 222};
 
         let diff = old.diff(&new).unwrap();
-        assert!(matches!(diff, Diff::NoChange));
+        assert!(matches!(diff, Diff::NoChange(_)));
 
         let old: HashMap<i32, i32> = map! {1: 111, 2: 222, 3: 333};
         let new: HashMap<i32, u32> = map! {1: 111, 2: 222, 3: 333};
@@ -489,7 +495,7 @@ mod tests {
         let new = Foo(1, 2, 3);
 
         let diff = old.diff(&new).unwrap();
-        assert!(matches!(diff, Diff::NoChange));
+        assert!(matches!(diff, Diff::NoChange(_)));
 
         let old = Foo(1, 2, 3);
         let new = Bar(1, 2, 3, 4);
@@ -505,12 +511,12 @@ mod tests {
             if let DiffType::TupleStruct(tuple_struct_diff) = modified {
                 let mut fields = tuple_struct_diff.field_iter();
 
-                assert!(matches!(fields.next(), Some(Diff::NoChange)));
+                assert!(matches!(fields.next(), Some(Diff::NoChange(_))));
                 assert!(matches!(
                     fields.next(),
                     Some(Diff::Modified(DiffType::Value(..)))
                 ));
-                assert!(matches!(fields.next(), Some(Diff::NoChange)));
+                assert!(matches!(fields.next(), Some(Diff::NoChange(_))));
                 assert!(matches!(fields.next(), None));
             } else {
                 panic!("expected `DiffType::TupleStruct`");
@@ -538,7 +544,7 @@ mod tests {
         let new = Foo { a: 123, b: 1.23 };
 
         let diff = old.diff(&new).unwrap();
-        assert!(matches!(diff, Diff::NoChange));
+        assert!(matches!(diff, Diff::NoChange(_)));
 
         let old = Foo { a: 123, b: 1.23 };
         let new = Bar {
@@ -558,7 +564,7 @@ mod tests {
             if let DiffType::Struct(struct_diff) = modified {
                 let mut fields = struct_diff.field_iter();
 
-                assert!(matches!(fields.next(), Some(("a", Diff::NoChange))));
+                assert!(matches!(fields.next(), Some(("a", Diff::NoChange(_)))));
                 assert!(matches!(
                     fields.next(),
                     Some(("b", Diff::Modified(DiffType::Value(..))))
@@ -591,7 +597,7 @@ mod tests {
             let new = Foo::A;
 
             let diff = old.diff(&new).unwrap();
-            assert!(matches!(diff, Diff::NoChange));
+            assert!(matches!(diff, Diff::NoChange(_)));
 
             let old = Foo::A;
             let new = Foo::B;
@@ -623,7 +629,7 @@ mod tests {
             let new = Foo::A(1, 2, 3);
 
             let diff = old.diff(&new).unwrap();
-            assert!(matches!(diff, Diff::NoChange));
+            assert!(matches!(diff, Diff::NoChange(_)));
 
             let old = Foo::A(1, 2, 3);
             let new = Foo::B(1, 2, 3);
@@ -646,12 +652,12 @@ mod tests {
                     if let EnumDiff::Tuple(tuple_diff) = enum_diff {
                         let mut fields = tuple_diff.field_iter();
 
-                        assert!(matches!(fields.next(), Some(Diff::NoChange)));
+                        assert!(matches!(fields.next(), Some(Diff::NoChange(_))));
                         assert!(matches!(
                             fields.next(),
                             Some(Diff::Modified(DiffType::Value(..)))
                         ));
-                        assert!(matches!(fields.next(), Some(Diff::NoChange)));
+                        assert!(matches!(fields.next(), Some(Diff::NoChange(_))));
                         assert!(matches!(fields.next(), None));
                     } else {
                         panic!("expected `EnumDiff::Tuple`");
@@ -681,7 +687,7 @@ mod tests {
             let new = Foo::A { x: 1.23, y: 4.56 };
 
             let diff = old.diff(&new).unwrap();
-            assert!(matches!(diff, Diff::NoChange));
+            assert!(matches!(diff, Diff::NoChange(_)));
 
             let old = Foo::A { x: 1.23, y: 4.56 };
             let new = Foo::B { x: 1.23, y: 4.56 };
@@ -704,7 +710,7 @@ mod tests {
                     if let EnumDiff::Struct(struct_diff) = enum_diff {
                         let mut fields = struct_diff.field_iter();
 
-                        assert!(matches!(fields.next(), Some(("x", Diff::NoChange))));
+                        assert!(matches!(fields.next(), Some(("x", Diff::NoChange(_)))));
                         assert!(matches!(
                             fields.next(),
                             Some(("y", Diff::Modified(DiffType::Value(..))))

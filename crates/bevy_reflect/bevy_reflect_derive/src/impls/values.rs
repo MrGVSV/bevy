@@ -80,6 +80,11 @@ pub(crate) fn impl_value(meta: &ReflectMeta) -> TokenStream {
             }
 
             #[inline]
+            fn diff<'new>(&self, other: &'new dyn #bevy_reflect_path::Reflect) -> #bevy_reflect_path::diff::DiffResult<'_, 'new> {
+                #bevy_reflect_path::diff::diff_value(self, other)
+            }
+
+            #[inline]
             fn apply(&mut self, value: &dyn #bevy_reflect_path::Reflect) {
                 let value = value.as_any();
                 if let Some(value) = value.downcast_ref::<Self>() {
