@@ -1,20 +1,22 @@
-use crate::diff::{Diff, DiffError, DiffResult, DiffType};
+use crate::diff::{Diff, DiffError, DiffResult, DiffType, ValueDiff};
 use crate::{Reflect, ReflectRef, Struct};
 use bevy_utils::HashMap;
+use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
 
 /// Diff object for (structs)[Struct].
-#[derive(Clone)]
 pub struct DiffedStruct<'old, 'new> {
-    new_value: &'new dyn Struct,
-    fields: HashMap<&'old str, Diff<'old, 'new>>,
-    field_order: Vec<&'old str>,
+    type_name: Cow<'new, str>,
+    fields: HashMap<Cow<'old, str>, Diff<'old, 'new>>,
+    field_order: Vec<Cow<'old, str>>,
 }
 
 impl<'old, 'new> DiffedStruct<'old, 'new> {
-    /// Returns the "new" struct value.
-    pub fn new_value(&self) -> &'new dyn Struct {
-        self.new_value
+    /// Returns the [type name] of the reflected value currently being diffed.
+    ///
+    /// [type name]: crate::Reflect::type_name
+    pub fn type_name(&self) -> &str {
+        &self.type_name
     }
 
     /// Returns the [`Diff`] for the field with the given name.
@@ -35,11 +37,10 @@ impl<'old, 'new> DiffedStruct<'old, 'new> {
     }
 
     /// Returns an iterator over the name and [`Diff`] for _every_ field.
-    pub fn field_iter(&self) -> impl Iterator<Item = (&'old str, &'_ Diff<'old, 'new>)> {
+    pub fn field_iter(&self) -> impl Iterator<Item = (&'_ str, &'_ Diff<'old, 'new>)> {
         self.field_order
             .iter()
-            .copied()
-            .map(|name| (name, self.fields.get(name).unwrap()))
+            .map(|name| (name.as_ref(), self.fields.get(name).unwrap()))
     }
 }
 
@@ -62,11 +63,11 @@ pub fn diff_struct<'old, 'new, T: Struct>(
     };
 
     if old.type_name() != new.type_name() {
-        return Ok(Diff::Replaced(new.as_reflect()));
+        return Ok(Diff::Replaced(ValueDiff::Borrowed(new.as_reflect())));
     }
 
     let mut diff = DiffedStruct {
-        new_value: new,
+        type_name: Cow::Borrowed(new.type_name()),
         fields: HashMap::with_capacity(new.field_len()),
         field_order: Vec::with_capacity(new.field_len()),
     };
@@ -77,8 +78,8 @@ pub fn diff_struct<'old, 'new, T: Struct>(
         let new_field = new.field(field_name).ok_or(DiffError::MissingField)?;
         let field_diff = old_field.diff(new_field)?;
         was_modified |= !matches!(field_diff, Diff::NoChange);
-        diff.fields.insert(field_name, field_diff);
-        diff.field_order.push(field_name);
+        diff.fields.insert(Cow::Borrowed(field_name), field_diff);
+        diff.field_order.push(Cow::Borrowed(field_name));
     }
 
     if was_modified {

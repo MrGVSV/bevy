@@ -1,19 +1,21 @@
-use crate::diff::{Diff, DiffError, DiffResult, DiffType};
+use std::borrow::Cow;
+use crate::diff::{Diff, DiffError, DiffResult, DiffType, ValueDiff};
 use crate::{Reflect, ReflectRef, TupleStruct};
 use std::fmt::{Debug, Formatter};
 use std::slice::Iter;
 
 /// Diff object for [tuple structs](TupleStruct).
-#[derive(Clone)]
 pub struct DiffedTupleStruct<'old, 'new> {
-    new_value: &'new dyn TupleStruct,
+    type_name: Cow<'new, str>,
     fields: Vec<Diff<'old, 'new>>,
 }
 
 impl<'old, 'new> DiffedTupleStruct<'old, 'new> {
-    /// Returns the "new" tuple struct value.
-    pub fn new_value(&self) -> &'new dyn TupleStruct {
-        self.new_value
+    /// Returns the [type name] of the reflected value currently being diffed.
+    ///
+    /// [type name]: crate::Reflect::type_name
+    pub fn type_name(&self) -> &str {
+        &self.type_name
     }
 
     /// Returns the [`Diff`] for the field at the given index.
@@ -51,11 +53,11 @@ pub fn diff_tuple_struct<'old, 'new, T: TupleStruct>(
     };
 
     if old.field_len() != new.field_len() || old.type_name() != new.type_name() {
-        return Ok(Diff::Replaced(new.as_reflect()));
+        return Ok(Diff::Replaced(ValueDiff::Borrowed(new.as_reflect())));
     }
 
     let mut diff = DiffedTupleStruct {
-        new_value: new,
+        type_name: Cow::Borrowed(new.type_name()),
         fields: Vec::with_capacity(old.field_len()),
     };
 

@@ -8,7 +8,7 @@ use std::{
     fmt::Debug,
 };
 
-use crate::diff::{Diff, DiffError, DiffResult, DiffType};
+use crate::diff::{Diff, DiffError, DiffResult, DiffType, ValueDiff};
 use crate::utility::NonGenericTypeInfoCell;
 pub use bevy_utils::AHasher as ReflectHasher;
 
@@ -183,12 +183,12 @@ pub trait Reflect: Any + Send + Sync {
         // Default implementation which should handle `ReflectRef::Value` types
 
         if self.type_name() != other.type_name() {
-            return Ok(Diff::Replaced(other));
+            return Ok(Diff::Replaced(ValueDiff::Borrowed(other)));
         }
 
         match self.reflect_partial_eq(other) {
             Some(true) => Ok(Diff::NoChange),
-            Some(false) => Ok(Diff::Modified(DiffType::Value(other))),
+            Some(false) => Ok(Diff::Modified(DiffType::Value(ValueDiff::Borrowed(other)))),
             None => Err(DiffError::Incomparable),
         }
     }
