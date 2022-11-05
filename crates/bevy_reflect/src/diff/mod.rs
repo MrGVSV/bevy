@@ -154,8 +154,6 @@ pub enum Diff<'old, 'new> {
     NoChange,
     /// Indicates that the type has been changed.
     ///
-    /// Note that for enums, this is also used when the variant has been changed.
-    ///
     /// # Example
     ///
     /// ```
@@ -621,7 +619,10 @@ mod tests {
             let new = Foo::B;
 
             let diff = old.diff(&new).unwrap();
-            assert!(matches!(diff, Diff::Replaced(..)));
+            assert!(matches!(
+                diff,
+                Diff::Modified(DiffType::Enum(EnumDiff::Swapped(..)))
+            ));
 
             let old = Foo::A;
             let new = Bar::A;
@@ -653,7 +654,10 @@ mod tests {
             let new = Foo::B(1, 2, 3);
 
             let diff = old.diff(&new).unwrap();
-            assert!(matches!(diff, Diff::Replaced(..)));
+            assert!(matches!(
+                diff,
+                Diff::Modified(DiffType::Enum(EnumDiff::Swapped(..)))
+            ));
 
             let old = Foo::A(1, 2, 3);
             let new = Bar::A(1, 2, 3);
@@ -711,7 +715,10 @@ mod tests {
             let new = Foo::B { x: 1.23, y: 4.56 };
 
             let diff = old.diff(&new).unwrap();
-            assert!(matches!(diff, Diff::Replaced(..)));
+            assert!(matches!(
+                diff,
+                Diff::Modified(DiffType::Enum(EnumDiff::Swapped(..)))
+            ));
 
             let old = Foo::A { x: 1.23, y: 4.56 };
             let new = Bar::A { x: 1.23, y: 4.56 };
