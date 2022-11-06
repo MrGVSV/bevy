@@ -6,6 +6,7 @@ use crate::{
 use std::{
     any::{self, Any, TypeId},
     fmt::Debug,
+    ops::{Deref, DerefMut},
 };
 
 use crate::utility::NonGenericTypeInfoCell;
@@ -28,6 +29,23 @@ pub enum ReflectRef<'a> {
     Value(&'a dyn Reflect),
 }
 
+impl Deref for ReflectRef<'_> {
+    type Target = dyn Reflect;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Struct(value) => value.as_reflect(),
+            Self::TupleStruct(value) => value.as_reflect(),
+            Self::Tuple(value) => value.as_reflect(),
+            Self::List(value) => value.as_reflect(),
+            Self::Array(value) => value.as_reflect(),
+            Self::Map(value) => value.as_reflect(),
+            Self::Enum(value) => value.as_reflect(),
+            Self::Value(value) => *value,
+        }
+    }
+}
+
 /// A mutable enumeration of "kinds" of reflected type.
 ///
 /// Each variant contains a trait object with methods specific to a kind of
@@ -45,6 +63,38 @@ pub enum ReflectMut<'a> {
     Value(&'a mut dyn Reflect),
 }
 
+impl Deref for ReflectMut<'_> {
+    type Target = dyn Reflect;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Struct(value) => value.as_reflect(),
+            Self::TupleStruct(value) => value.as_reflect(),
+            Self::Tuple(value) => value.as_reflect(),
+            Self::List(value) => value.as_reflect(),
+            Self::Array(value) => value.as_reflect(),
+            Self::Map(value) => value.as_reflect(),
+            Self::Enum(value) => value.as_reflect(),
+            Self::Value(value) => *value,
+        }
+    }
+}
+
+impl DerefMut for ReflectMut<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Self::Struct(value) => value.as_reflect_mut(),
+            Self::TupleStruct(value) => value.as_reflect_mut(),
+            Self::Tuple(value) => value.as_reflect_mut(),
+            Self::List(value) => value.as_reflect_mut(),
+            Self::Array(value) => value.as_reflect_mut(),
+            Self::Map(value) => value.as_reflect_mut(),
+            Self::Enum(value) => value.as_reflect_mut(),
+            Self::Value(value) => *value,
+        }
+    }
+}
+
 /// An owned enumeration of "kinds" of reflected type.
 ///
 /// Each variant contains a trait object with methods specific to a kind of
@@ -60,6 +110,53 @@ pub enum ReflectOwned {
     Map(Box<dyn Map>),
     Enum(Box<dyn Enum>),
     Value(Box<dyn Reflect>),
+}
+
+impl Deref for ReflectOwned {
+    type Target = dyn Reflect;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Struct(value) => value.as_reflect(),
+            Self::TupleStruct(value) => value.as_reflect(),
+            Self::Tuple(value) => value.as_reflect(),
+            Self::List(value) => value.as_reflect(),
+            Self::Array(value) => value.as_reflect(),
+            Self::Map(value) => value.as_reflect(),
+            Self::Enum(value) => value.as_reflect(),
+            Self::Value(value) => value.as_reflect(),
+        }
+    }
+}
+
+impl DerefMut for ReflectOwned {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Self::Struct(value) => value.as_reflect_mut(),
+            Self::TupleStruct(value) => value.as_reflect_mut(),
+            Self::Tuple(value) => value.as_reflect_mut(),
+            Self::List(value) => value.as_reflect_mut(),
+            Self::Array(value) => value.as_reflect_mut(),
+            Self::Map(value) => value.as_reflect_mut(),
+            Self::Enum(value) => value.as_reflect_mut(),
+            Self::Value(value) => value.as_reflect_mut(),
+        }
+    }
+}
+
+impl Into<Box<dyn Reflect>> for ReflectOwned {
+    fn into(self) -> Box<dyn Reflect> {
+        match self {
+            Self::Struct(value) => value.into_reflect(),
+            Self::TupleStruct(value) => value.into_reflect(),
+            Self::Tuple(value) => value.into_reflect(),
+            Self::List(value) => value.into_reflect(),
+            Self::Array(value) => value.into_reflect(),
+            Self::Map(value) => value.into_reflect(),
+            Self::Enum(value) => value.into_reflect(),
+            Self::Value(value) => value,
+        }
+    }
 }
 
 /// A reflected Rust type.
