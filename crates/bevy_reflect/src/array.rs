@@ -1,4 +1,4 @@
-use crate::diff::{diff_array, DiffResult};
+use crate::diff::{diff_array, DiffApplyError, DiffResult, DiffedArray};
 use crate::{
     utility::NonGenericTypeInfoCell, DynamicInfo, Reflect, ReflectMut, ReflectOwned, ReflectRef,
     TypeInfo, Typed,
@@ -41,6 +41,15 @@ pub trait Array: Reflect {
             values: self.iter().map(|value| value.clone_value()).collect(),
         }
     }
+
+    /// Apply the given [`DiffedArray`] to this value.
+    ///
+    /// If successful, this will return the updated value.
+    /// Otherwise, this will return a [`DiffApplyError`].
+    fn apply_array_diff(
+        self: Box<Self>,
+        diff: DiffedArray,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError>;
 }
 
 /// A container for compile-time array info.
@@ -297,6 +306,23 @@ impl Array for DynamicArray {
                 .map(|value| value.clone_value())
                 .collect(),
         }
+    }
+
+    fn apply_array_diff(
+        self: Box<Self>,
+        diff: DiffedArray,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() || self.len() != diff.len() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        let mut new_elements = Vec::with_capacity(self.len());
+
+        for (element, element_diff) in self.drain().into_iter().zip(diff.take_changes()) {
+            new_elements.push(element.apply_diff(element_diff)?);
+        }
+
+        Ok(Box::new(DynamicArray::new(new_elements.into_boxed_slice())))
     }
 }
 

@@ -8,7 +8,10 @@ use crate::{
     VariantInfo, VariantType,
 };
 
-use crate::diff::{diff_array, diff_enum, diff_list, diff_map, DiffResult};
+use crate::diff::{
+    diff_array, diff_enum, diff_list, diff_map, DiffApplyError, DiffResult, DiffedArray,
+    DiffedList, DiffedMap, EnumDiff, ListDiff, MapDiff, ValueDiff,
+};
 use crate::utility::{GenericTypeInfoCell, NonGenericTypeInfoCell};
 use bevy_reflect_derive::{impl_from_reflect_value, impl_reflect_value};
 use bevy_utils::{Duration, Instant};
@@ -205,6 +208,13 @@ impl<T: FromReflect> Array for Vec<T> {
             .map(|value| Box::new(value) as Box<dyn Reflect>)
             .collect()
     }
+
+    fn apply_array_diff(
+        self: Box<Self>,
+        _diff: DiffedArray,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        Err(DiffApplyError::ExpectedList)
+    }
 }
 
 impl<T: FromReflect> List for Vec<T> {
@@ -222,6 +232,57 @@ impl<T: FromReflect> List for Vec<T> {
 
     fn pop(&mut self) -> Option<Box<dyn Reflect>> {
         self.pop().map(|value| Box::new(value) as Box<dyn Reflect>)
+    }
+
+    fn apply_list_diff(
+        self: Box<Self>,
+        diff: DiffedList,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        let new_len = (self.len() + diff.total_insertions()) - diff.total_deletions();
+        let mut new = Vec::<T>::with_capacity(new_len);
+
+        let mut changes = diff.take_changes();
+        changes.reverse();
+
+        fn has_change(changes: &[ListDiff], index: usize) -> bool {
+            changes
+                .last()
+                .map(|change| change.index() == index)
+                .unwrap_or_default()
+        }
+
+        let insert = |value: ValueDiff, list: &mut Vec<T>| -> Result<(), DiffApplyError> {
+            Ok(list.push(
+                FromReflect::from_reflect(value.as_reflect())
+                    .ok_or(DiffApplyError::TypeMismatch)?,
+            ))
+        };
+
+        'outer: for (curr_index, element) in self.into_iter().enumerate() {
+            while has_change(&changes, curr_index) {
+                match changes.pop().unwrap() {
+                    ListDiff::Deleted(_) => {
+                        continue 'outer;
+                    }
+                    ListDiff::Inserted(_, value) => {
+                        insert(value, &mut new)?;
+                    }
+                }
+            }
+
+            new.push(element);
+        }
+
+        // Insert any remaining elements
+        while let Some(ListDiff::Inserted(_, value)) = changes.pop() {
+            insert(value, &mut new)?;
+        }
+
+        Ok(Box::new(new))
     }
 }
 
@@ -373,6 +434,57 @@ impl<K: FromReflect + Eq + Hash, V: FromReflect> Map for HashMap<K, V> {
             dynamic_map.insert_boxed(k.clone_value(), v.clone_value());
         }
         dynamic_map
+    }
+
+    fn apply_map_diff(
+        mut self: Box<Self>,
+        diff: DiffedMap,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        fn convert<T: FromReflect>(value: ValueDiff) -> Result<T, DiffApplyError> {
+            let converted = match value {
+                ValueDiff::Borrowed(value) => T::from_reflect(value),
+                ValueDiff::Owned(value) => T::from_reflect(value.as_ref()),
+            };
+            converted.ok_or_else(|| {
+                DiffApplyError::Failed(format!(
+                    "failed to call `FromReflect::from_reflect` on type `{}`",
+                    std::any::type_name::<T>()
+                ))
+            })
+        }
+
+        for change in diff.take_changes() {
+            match change {
+                MapDiff::Deleted(key) => {
+                    let key = convert(key)?;
+                    self.remove(&key);
+                }
+                MapDiff::Inserted(key, value) => {
+                    let key = convert(key)?;
+                    let value = convert(value)?;
+                    self.insert(key, value);
+                }
+                MapDiff::Modified(key, diff) => {
+                    let key = convert(key)?;
+                    if let Some(value) = self.remove(&key) {
+                        let new_value = V::from_reflect(Box::new(value).apply_diff(diff)?.as_ref())
+                            .ok_or_else(|| {
+                                DiffApplyError::Failed(format!(
+                                    "failed to call `FromReflect::from_reflect` on type `{}`",
+                                    std::any::type_name::<V>()
+                                ))
+                            })?;
+                        self.insert(key, new_value);
+                    }
+                }
+            }
+        }
+
+        Ok(self)
     }
 
     fn insert_boxed(
@@ -533,6 +645,33 @@ impl<T: Reflect, const N: usize> Array for [T; N] {
         self.into_iter()
             .map(|value| Box::new(value) as Box<dyn Reflect>)
             .collect()
+    }
+
+    fn apply_array_diff(
+        self: Box<Self>,
+        diff: DiffedArray,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        let mut elements = Vec::with_capacity(self.len());
+        for (elt, diff) in self.into_iter().map(Box::new).zip(diff.take_changes()) {
+            let value = elt
+                .apply_diff(diff)?
+                .take::<T>()
+                .map_err(|_| DiffApplyError::TypeMismatch)?;
+            elements.push(value);
+        }
+
+        let new: [T; N] = elements.try_into().map_err(|_| {
+            DiffApplyError::Failed(format!(
+                "could not convert temp Vec into `{}`",
+                std::any::type_name::<Self>(),
+            ))
+        })?;
+
+        Ok(Box::new(new))
     }
 }
 
@@ -822,6 +961,32 @@ impl<T: FromReflect> Enum for Option<T> {
 
     fn clone_dynamic(&self) -> DynamicEnum {
         DynamicEnum::from_ref::<Self>(self)
+    }
+
+    fn apply_enum_diff(
+        self: Box<Self>,
+        diff: EnumDiff,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        match diff {
+            EnumDiff::Swapped(ValueDiff::Borrowed(value)) => Ok(value.clone_value()),
+            EnumDiff::Swapped(ValueDiff::Owned(value)) => Ok(value),
+            EnumDiff::Struct(_) => Err(DiffApplyError::ExpectedTupleVariant),
+            EnumDiff::Tuple(diff) => match *self {
+                None => Err(DiffApplyError::ExpectedTupleVariant),
+                Some(field_0) => {
+                    let change = diff.take_changes().pop().unwrap();
+                    let new_field_0 = change.apply(Box::new(field_0))?;
+                    Ok(Box::new(Some(
+                        FromReflect::from_reflect(new_field_0.as_ref())
+                            .ok_or(DiffApplyError::TypeMismatch)?,
+                    )))
+                }
+            },
+        }
     }
 }
 

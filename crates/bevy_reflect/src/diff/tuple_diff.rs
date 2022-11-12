@@ -40,8 +40,14 @@ impl<'old, 'new> DiffedTuple<'old, 'new> {
         self.fields.iter()
     }
 
+    /// Take the changes contained in this diff.
+    pub fn take_changes(self) -> Vec<Diff<'old, 'new>> {
+        self.fields
+    }
+
     pub(crate) fn push(&mut self, field_diff: Diff<'old, 'new>) {
-        self.fields.push(field_diff);
+        let index = self.fields.len();
+        self.fields.insert(index, field_diff);
     }
 }
 

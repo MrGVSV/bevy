@@ -1,7 +1,9 @@
 use smallvec::SmallVec;
 use std::any::Any;
 
-use crate::diff::{diff_list, DiffResult};
+use crate::diff::{
+    diff_list, DiffApplyError, DiffResult, DiffedArray, DiffedList, ListDiff, ValueDiff,
+};
 use crate::utility::GenericTypeInfoCell;
 use crate::{
     Array, ArrayIter, FromReflect, FromType, GetTypeRegistration, List, ListInfo, Reflect,
@@ -44,6 +46,13 @@ where
             .map(|value| Box::new(value) as Box<dyn Reflect>)
             .collect()
     }
+
+    fn apply_array_diff(
+        self: Box<Self>,
+        _diff: DiffedArray,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        Err(DiffApplyError::ExpectedList)
+    }
 }
 
 impl<T: smallvec::Array + Send + Sync + 'static> List for SmallVec<T>
@@ -64,6 +73,57 @@ where
 
     fn pop(&mut self) -> Option<Box<dyn Reflect>> {
         self.pop().map(|value| Box::new(value) as Box<dyn Reflect>)
+    }
+
+    fn apply_list_diff(
+        self: Box<Self>,
+        diff: DiffedList,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        let new_len = (self.len() + diff.total_insertions()) - diff.total_deletions();
+        let mut new = SmallVec::<T>::with_capacity(new_len);
+
+        let mut changes = diff.take_changes();
+        changes.reverse();
+
+        fn has_change(changes: &[ListDiff], index: usize) -> bool {
+            changes
+                .last()
+                .map(|change| change.index() == index)
+                .unwrap_or_default()
+        }
+
+        let insert = |value: ValueDiff, list: &mut SmallVec<T>| -> Result<(), DiffApplyError> {
+            Ok(list.push(
+                FromReflect::from_reflect(value.as_reflect())
+                    .ok_or(DiffApplyError::TypeMismatch)?,
+            ))
+        };
+
+        'outer: for (curr_index, element) in self.into_iter().enumerate() {
+            while has_change(&changes, curr_index) {
+                match changes.pop().unwrap() {
+                    ListDiff::Deleted(_) => {
+                        continue 'outer;
+                    }
+                    ListDiff::Inserted(_, value) => {
+                        insert(value, &mut new)?;
+                    }
+                }
+            }
+
+            new.push(element);
+        }
+
+        // Insert any remaining elements
+        while let Some(ListDiff::Inserted(_, value)) = changes.pop() {
+            insert(value, &mut new)?;
+        }
+
+        Ok(Box::new(new))
     }
 }
 

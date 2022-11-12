@@ -1,6 +1,6 @@
-use std::borrow::Cow;
 use crate::diff::{Diff, DiffError, DiffResult, DiffType, ValueDiff};
 use crate::{Reflect, ReflectRef, TupleStruct};
+use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
 use std::slice::Iter;
 
@@ -31,6 +31,11 @@ impl<'old, 'new> DiffedTupleStruct<'old, 'new> {
     /// Returns an iterator over the [`Diff`] for _every_ field.
     pub fn field_iter(&self) -> Iter<'_, Diff<'old, 'new>> {
         self.fields.iter()
+    }
+
+    /// Take the changes contained in this diff.
+    pub fn take_changes(self) -> Vec<Diff<'old, 'new>> {
+        self.fields
     }
 }
 

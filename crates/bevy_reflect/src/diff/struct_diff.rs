@@ -51,6 +51,11 @@ impl<'old, 'new> DiffedStruct<'old, 'new> {
             .map(|name| (name.as_ref(), self.fields.get(name).unwrap()))
     }
 
+    /// Take the changes contained in this diff.
+    pub fn take_changes(self) -> HashMap<Cow<'old, str>, Diff<'old, 'new>> {
+        self.fields
+    }
+
     pub(crate) fn push(&mut self, field_name: Cow<'old, str>, field_diff: Diff<'old, 'new>) {
         self.fields.insert(field_name.clone(), field_diff);
         self.field_order.push(field_name);

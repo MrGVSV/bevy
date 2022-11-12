@@ -4,7 +4,7 @@ use std::hash::Hash;
 
 use bevy_utils::{Entry, HashMap};
 
-use crate::diff::{diff_map, DiffResult};
+use crate::diff::{diff_map, DiffApplyError, DiffResult, DiffedMap, MapDiff, ValueDiff};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{DynamicInfo, Reflect, ReflectMut, ReflectOwned, ReflectRef, TypeInfo, Typed};
 
@@ -48,6 +48,13 @@ pub trait Map: Reflect {
 
     /// Clones the map, producing a [`DynamicMap`].
     fn clone_dynamic(&self) -> DynamicMap;
+
+    /// Apply the given [`DiffedMap`] to this value.
+    ///
+    /// If successful, this will return the updated value.
+    /// Otherwise, this will return a [`DiffApplyError`].
+    fn apply_map_diff(self: Box<Self>, diff: DiffedMap)
+        -> Result<Box<dyn Reflect>, DiffApplyError>;
 
     /// Inserts a key-value pair into the map.
     ///
@@ -249,6 +256,56 @@ impl Map for DynamicMap {
 
     fn drain(self: Box<Self>) -> Vec<(Box<dyn Reflect>, Box<dyn Reflect>)> {
         self.values
+    }
+
+    fn apply_map_diff(
+        mut self: Box<Self>,
+        diff: DiffedMap,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        for change in diff.take_changes() {
+            match change {
+                MapDiff::Deleted(key) => {
+                    let hash = match key {
+                        ValueDiff::Borrowed(key) => key.reflect_hash().expect(HASH_ERROR),
+                        ValueDiff::Owned(key) => key.reflect_hash().expect(HASH_ERROR),
+                    };
+                    if let Some(index) = self.indices.remove(&hash) {
+                        self.values.remove(index);
+                    }
+                }
+                MapDiff::Inserted(key, value) => {
+                    let key = match key {
+                        ValueDiff::Borrowed(key) => key.clone_value(),
+                        ValueDiff::Owned(key) => key,
+                    };
+                    let value = match value {
+                        ValueDiff::Borrowed(value) => value.clone_value(),
+                        ValueDiff::Owned(value) => value,
+                    };
+
+                    self.insert_boxed(key, value);
+                }
+                MapDiff::Modified(key, diff) => {
+                    let hash = match key {
+                        ValueDiff::Borrowed(key) => key.reflect_hash().expect(HASH_ERROR),
+                        ValueDiff::Owned(key) => key.reflect_hash().expect(HASH_ERROR),
+                    };
+                    if let Some(index) = self.indices.remove(&hash) {
+                        let (key, old_value) = self.values.swap_remove(index);
+                        let new_value = old_value.apply_diff(diff)?;
+                        self.values.push((key, new_value));
+                        let end = self.values.len() - 1;
+                        self.values.swap(index, end);
+                    }
+                }
+            }
+        }
+
+        Ok(self)
     }
 }
 

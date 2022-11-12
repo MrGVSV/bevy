@@ -1,9 +1,10 @@
-use crate::diff::{diff_tuple, DiffResult};
+use crate::diff::{diff_tuple, DiffApplyError, DiffResult, DiffedTuple};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{
     DynamicInfo, FromReflect, GetTypeRegistration, Reflect, ReflectMut, ReflectOwned, ReflectRef,
     TypeInfo, TypeRegistration, Typed, UnnamedField,
 };
+use paste::paste;
 use std::any::{Any, TypeId};
 use std::fmt::{Debug, Formatter};
 use std::slice::Iter;
@@ -46,6 +47,15 @@ pub trait Tuple: Reflect {
 
     /// Clones the struct into a [`DynamicTuple`].
     fn clone_dynamic(&self) -> DynamicTuple;
+
+    /// Apply the given [`DiffedTuple`] to this value.
+    ///
+    /// If successful, this will return the updated value.
+    /// Otherwise, this will return a [`DiffApplyError`].
+    fn apply_tuple_diff(
+        self: Box<Self>,
+        diff: DiffedTuple,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError>;
 }
 
 /// An iterator over the field values of a tuple.
@@ -289,6 +299,25 @@ impl Tuple for DynamicTuple {
                 .collect(),
         }
     }
+
+    fn apply_tuple_diff(
+        mut self: Box<Self>,
+        diff: DiffedTuple,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() || self.field_len() != diff.field_len() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        let end = self.fields.len() - 1;
+        for (index, diff) in diff.take_changes().into_iter().enumerate() {
+            let field = self.fields.swap_remove(index);
+            let new_value = field.apply_diff(diff)?;
+            self.fields.push(new_value);
+            self.fields.swap(index, end);
+        }
+
+        Ok(self)
+    }
 }
 
 impl Reflect for DynamicTuple {
@@ -506,6 +535,29 @@ macro_rules! impl_reflect_tuple {
                 };
                 dyn_tuple.generate_name();
                 dyn_tuple
+            }
+
+            fn apply_tuple_diff(self: Box<Self>, diff: DiffedTuple) -> Result<Box<dyn Reflect>, DiffApplyError> {
+                if self.type_name() != diff.type_name() || self.field_len() != diff.field_len() {
+                    return Err(DiffApplyError::TypeMismatch);
+                }
+
+                let mut _diffs = diff.take_changes();
+                _diffs.reverse();
+
+                paste! {
+                    $(
+                        let [<field_ $index>] = Reflect::apply_diff(
+                                Box::new(self.$index),
+                                _diffs.pop().ok_or(DiffApplyError::MissingField)?
+                            )?
+                            .take::<$name>()
+                            .map_err(|_| DiffApplyError::TypeMismatch)?;
+                    )*
+
+
+                    Ok(Box::new(($([<field_ $index>]),*)))
+                }
             }
         }
 

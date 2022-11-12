@@ -1,4 +1,4 @@
-use crate::diff::{diff_struct, DiffResult};
+use crate::diff::{diff_struct, DiffApplyError, DiffResult, DiffedStruct};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{
     DynamicInfo, NamedField, Reflect, ReflectMut, ReflectOwned, ReflectRef, TypeInfo, Typed,
@@ -67,6 +67,12 @@ pub trait Struct: Reflect {
 
     /// Clones the struct into a [`DynamicStruct`].
     fn clone_dynamic(&self) -> DynamicStruct;
+
+    /// Apply the given [`DiffedStruct`] to this value.
+    ///
+    /// If successful, this will return the updated value.
+    /// Otherwise, this will return a [`DiffApplyError`].
+    fn apply_struct_diff(self: Box<Self>, diff: DiffedStruct) -> Result<Box<dyn Reflect>, DiffApplyError>;
 }
 
 /// A container for compile-time struct info.
@@ -376,6 +382,31 @@ impl Struct for DynamicStruct {
                 .map(|value| value.clone_value())
                 .collect(),
         }
+    }
+
+    #[inline]
+    fn apply_struct_diff(self: Box<Self>, diff: DiffedStruct) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        let mut new = Self::default();
+        new.set_name(self.type_name().to_string());
+
+        let mut field_map = self
+            .field_names
+            .into_iter()
+            .zip(self.fields.into_iter())
+            .collect::<HashMap<Cow<'static, str>, Box<dyn Reflect>>>();
+
+        for (field_name, field_diff) in diff.take_changes().into_iter() {
+            let field_value = field_map
+                .remove(&field_name)
+                .ok_or(DiffApplyError::MissingField)?;
+            new.insert_boxed(&field_name, field_value.apply_diff(field_diff)?);
+        }
+
+        Ok(Box::new(new))
     }
 }
 

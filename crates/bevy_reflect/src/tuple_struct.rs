@@ -1,4 +1,4 @@
-use crate::diff::{diff_tuple_struct, DiffResult};
+use crate::diff::{diff_tuple_struct, DiffApplyError, DiffResult, DiffedTupleStruct};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{
     DynamicInfo, Reflect, ReflectMut, ReflectOwned, ReflectRef, TypeInfo, Typed, UnnamedField,
@@ -47,6 +47,15 @@ pub trait TupleStruct: Reflect {
 
     /// Clones the struct into a [`DynamicTupleStruct`].
     fn clone_dynamic(&self) -> DynamicTupleStruct;
+
+    /// Apply the given [`DiffedTupleStruct`] to this value.
+    ///
+    /// If successful, this will return the updated value.
+    /// Otherwise, this will return a [`DiffApplyError`].
+    fn apply_tuple_struct_diff(
+        self: Box<Self>,
+        diff: DiffedTupleStruct,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError>;
 }
 
 /// A container for compile-time tuple struct info.
@@ -279,6 +288,25 @@ impl TupleStruct for DynamicTupleStruct {
                 .map(|value| value.clone_value())
                 .collect(),
         }
+    }
+
+    fn apply_tuple_struct_diff(
+        mut self: Box<Self>,
+        diff: DiffedTupleStruct,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        let end = self.fields.len() - 1;
+        for (index, diff) in diff.take_changes().into_iter().enumerate() {
+            let value = self.fields.swap_remove(index);
+            let new_value = value.apply_diff(diff)?;
+            self.fields.push(new_value);
+            self.fields.swap(index, end);
+        }
+
+        Ok(self)
     }
 }
 

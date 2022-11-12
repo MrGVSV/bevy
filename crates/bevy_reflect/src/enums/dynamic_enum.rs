@@ -1,4 +1,4 @@
-use crate::diff::{diff_enum, DiffResult};
+use crate::diff::{diff_enum, DiffApplyError, DiffResult, EnumDiff};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{
     enum_debug, enum_hash, enum_partial_eq, DynamicInfo, DynamicStruct, DynamicTuple, Enum,
@@ -286,6 +286,71 @@ impl Enum for DynamicEnum {
             variant_index: self.variant_index,
             variant_name: self.variant_name.clone(),
             variant: self.variant.clone(),
+        }
+    }
+
+    fn apply_enum_diff(
+        self: Box<Self>,
+        diff: EnumDiff,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        match diff {
+            EnumDiff::Swapped(value_diff) => {
+                if let ReflectRef::Enum(value) = value_diff.reflect_ref() {
+                    Ok(Box::new(value.clone_dynamic()))
+                } else {
+                    Err(DiffApplyError::ExpectedEnum)
+                }
+            }
+            EnumDiff::Tuple(tuple_diff) => {
+                if let DynamicVariant::Tuple(mut base) = self.variant {
+                    let name = self.name;
+                    base.set_name(name.clone());
+                    let variant = Box::new(base)
+                        .apply_tuple_diff(tuple_diff)?
+                        .take::<DynamicTuple>()
+                        .map_err(|value| {
+                            DiffApplyError::Failed(format!(
+                                "expected `DynamicTuple` but got `{}`",
+                                value.type_name()
+                            ))
+                        })?;
+                    Ok(Box::new(DynamicEnum::new_with_index(
+                        name,
+                        self.variant_index,
+                        self.variant_name,
+                        variant,
+                    )))
+                } else {
+                    Err(DiffApplyError::ExpectedTupleVariant)
+                }
+            }
+            EnumDiff::Struct(struct_diff) => {
+                if let DynamicVariant::Struct(mut base) = self.variant {
+                    let name = self.name;
+                    base.set_name(name.clone());
+                    let variant = Box::new(base)
+                        .apply_struct_diff(struct_diff)?
+                        .take::<DynamicStruct>()
+                        .map_err(|value| {
+                            DiffApplyError::Failed(format!(
+                                "expected `DynamicStruct` but got `{}`",
+                                value.type_name()
+                            ))
+                        })?;
+                    Ok(Box::new(DynamicEnum::new_with_index(
+                        name,
+                        self.variant_index,
+                        self.variant_name,
+                        variant,
+                    )))
+                } else {
+                    Err(DiffApplyError::ExpectedStructVariant)
+                }
+            }
         }
     }
 }

@@ -117,6 +117,27 @@ pub(crate) fn impl_tuple_struct(reflect_struct: &ReflectStruct) -> TokenStream {
                 #(dynamic.insert_boxed(self.#field_idents.clone_value());)*
                 dynamic
             }
+
+            fn apply_tuple_struct_diff(self: Box<Self>, diff: #bevy_reflect_path::diff::DiffedTupleStruct) -> Result<Box<dyn #bevy_reflect_path::Reflect>, #bevy_reflect_path::diff::DiffApplyError> {
+                if self.type_name() != diff.type_name() {
+                    return Err(#bevy_reflect_path::diff::DiffApplyError::TypeMismatch);
+                }
+
+                let mut field_diffs = diff.take_changes();
+                field_diffs.reverse();
+
+                Ok(Box::new(Self {
+                    #(
+                        #field_idents: #bevy_reflect_path::Reflect::apply_diff(
+                                Box::new(self.#field_idents),
+                                field_diffs.pop().ok_or(#bevy_reflect_path::diff::DiffApplyError::MissingField)?
+                            )?
+                            .take::<#field_types>()
+                            .map_err(|_| #bevy_reflect_path::diff::DiffApplyError::TypeMismatch)?,
+                    )*
+                    ..*self
+                }))
+            }
         }
 
         impl #impl_generics #bevy_reflect_path::Reflect for #struct_name #ty_generics #where_clause {

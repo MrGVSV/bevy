@@ -1,6 +1,6 @@
-use std::borrow::Cow;
 use crate::diff::{Diff, DiffError, DiffResult, DiffType, ValueDiff};
 use crate::{List, Reflect, ReflectRef};
+use std::borrow::Cow;
 use std::fmt::{Debug, Formatter};
 use std::slice::Iter;
 
@@ -15,13 +15,35 @@ pub enum ListDiff<'new> {
     Inserted(usize, ValueDiff<'new>),
 }
 
+impl<'new> ListDiff<'new> {
+    pub fn index(&self) -> usize {
+        match self {
+            ListDiff::Deleted(index) => *index,
+            ListDiff::Inserted(index, _) => *index,
+        }
+    }
+}
+
 /// Diff object for [lists](List).
 pub struct DiffedList<'new> {
     type_name: Cow<'new, str>,
     changes: Vec<ListDiff<'new>>,
+    total_insertions: usize,
 }
 
 impl<'new> DiffedList<'new> {
+    pub(crate) fn new(type_name: &'new str, changes: Vec<ListDiff<'new>>) -> Self {
+        let total_insertions = changes
+            .iter()
+            .filter(|change| matches!(change, ListDiff::Inserted(..)))
+            .count();
+
+        Self {
+            type_name: Cow::Borrowed(type_name),
+            changes,
+            total_insertions,
+        }
+    }
     /// Returns the [type name] of the reflected value currently being diffed.
     ///
     /// [type name]: crate::Reflect::type_name
@@ -38,6 +60,21 @@ impl<'new> DiffedList<'new> {
     /// the "old" list into the "new" one.
     pub fn iter_changes(&self) -> Iter<'_, ListDiff<'new>> {
         self.changes.iter()
+    }
+
+    /// The total number of inserted elements.
+    pub fn total_insertions(&self) -> usize {
+        self.total_insertions
+    }
+
+    /// The total number of deleted elements.
+    pub fn total_deletions(&self) -> usize {
+        self.changes.len() - self.total_insertions
+    }
+
+    /// Take the changes contained in this diff.
+    pub fn take_changes(self) -> Vec<ListDiff<'new>> {
+        self.changes
     }
 }
 
@@ -66,10 +103,10 @@ pub fn diff_list<'old, 'new, T: List>(
     let changes = ListDiffer::new(old, new).diff()?;
 
     if let Some(changes) = changes {
-        Ok(Diff::Modified(DiffType::List(DiffedList {
-            type_name: Cow::Borrowed(new.type_name()),
+        Ok(Diff::Modified(DiffType::List(DiffedList::new(
+            new.type_name(),
             changes,
-        })))
+        ))))
     } else {
         Ok(Diff::NoChange)
     }

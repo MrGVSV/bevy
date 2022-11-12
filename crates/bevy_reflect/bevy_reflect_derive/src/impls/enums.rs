@@ -3,8 +3,8 @@ use crate::enum_utility::{get_variant_constructors, EnumVariantConstructors};
 use crate::impls::impl_typed;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use quote::quote;
-use syn::Fields;
+use quote::{format_ident, quote};
+use syn::{Fields, Path};
 
 pub(crate) fn impl_enum(reflect_enum: &ReflectEnum) -> TokenStream {
     let bevy_reflect_path = reflect_enum.meta().bevy_reflect_path();
@@ -13,6 +13,7 @@ pub(crate) fn impl_enum(reflect_enum: &ReflectEnum) -> TokenStream {
     let ref_name = Ident::new("__name_param", Span::call_site());
     let ref_index = Ident::new("__index_param", Span::call_site());
     let ref_value = Ident::new("__value_param", Span::call_site());
+    let ref_diff = Ident::new("__diff", Span::call_site());
 
     let EnumImpls {
         variant_info,
@@ -24,7 +25,9 @@ pub(crate) fn impl_enum(reflect_enum: &ReflectEnum) -> TokenStream {
         enum_variant_name,
         enum_variant_index,
         enum_variant_type,
-    } = generate_impls(reflect_enum, &ref_index, &ref_name);
+        enum_tuple_variant_diff,
+        enum_struct_variant_diff,
+    } = generate_impls(reflect_enum, &ref_index, &ref_name, &ref_diff);
 
     let EnumVariantConstructors {
         variant_names,
@@ -174,6 +177,32 @@ pub(crate) fn impl_enum(reflect_enum: &ReflectEnum) -> TokenStream {
             fn clone_dynamic(&self) -> #bevy_reflect_path::DynamicEnum {
                 #bevy_reflect_path::DynamicEnum::from_ref::<Self>(self)
             }
+
+            fn apply_enum_diff(
+                self: Box<Self>,
+                diff: #bevy_reflect_path::diff::EnumDiff,
+            ) -> Result<Box<dyn #bevy_reflect_path::Reflect>, #bevy_reflect_path::diff::DiffApplyError> {
+                if self.type_name() != diff.type_name() {
+                    return Err(#bevy_reflect_path::diff::DiffApplyError::TypeMismatch);
+                }
+
+                match diff {
+                    #bevy_reflect_path::diff::EnumDiff::Swapped(
+                        #bevy_reflect_path::diff::ValueDiff::Borrowed(value)
+                    ) => Ok(value.clone_value()),
+                    #bevy_reflect_path::diff::EnumDiff::Swapped(
+                        #bevy_reflect_path::diff::ValueDiff::Owned(value)
+                    ) => Ok(value),
+                    #bevy_reflect_path::diff::EnumDiff::Tuple(#ref_diff) => match *self {
+                        #(#enum_tuple_variant_diff)*
+                        _ => Err(#bevy_reflect_path::diff::DiffApplyError::ExpectedTupleVariant)
+                    },
+                    #bevy_reflect_path::diff::EnumDiff::Struct(#ref_diff) => match *self {
+                        #(#enum_struct_variant_diff)*
+                        _ => Err(#bevy_reflect_path::diff::DiffApplyError::ExpectedStructVariant)
+                    },
+                }
+            }
         }
 
         impl #impl_generics #bevy_reflect_path::Reflect for #enum_name #ty_generics #where_clause {
@@ -297,9 +326,16 @@ struct EnumImpls {
     enum_variant_name: Vec<proc_macro2::TokenStream>,
     enum_variant_index: Vec<proc_macro2::TokenStream>,
     enum_variant_type: Vec<proc_macro2::TokenStream>,
+    enum_tuple_variant_diff: Vec<proc_macro2::TokenStream>,
+    enum_struct_variant_diff: Vec<proc_macro2::TokenStream>,
 }
 
-fn generate_impls(reflect_enum: &ReflectEnum, ref_index: &Ident, ref_name: &Ident) -> EnumImpls {
+fn generate_impls(
+    reflect_enum: &ReflectEnum,
+    ref_index: &Ident,
+    ref_name: &Ident,
+    ref_diff: &Ident,
+) -> EnumImpls {
     let bevy_reflect_path = reflect_enum.meta().bevy_reflect_path();
 
     let mut variant_info = Vec::new();
@@ -311,6 +347,8 @@ fn generate_impls(reflect_enum: &ReflectEnum, ref_index: &Ident, ref_name: &Iden
     let mut enum_variant_name = Vec::new();
     let mut enum_variant_index = Vec::new();
     let mut enum_variant_type = Vec::new();
+    let mut enum_tuple_variant_diff = Vec::new();
+    let mut enum_struct_variant_diff = Vec::new();
 
     for (variant_index, variant) in reflect_enum.variants().iter().enumerate() {
         let ident = &variant.data.ident;
@@ -403,6 +441,10 @@ fn generate_impls(reflect_enum: &ReflectEnum, ref_index: &Ident, ref_name: &Iden
                     }
                 });
 
+                enum_tuple_variant_diff.push(
+                    get_apply_diff_impl(variant, &unit, ref_diff, &bevy_reflect_path).unwrap(),
+                );
+
                 let field_len = args.len();
                 push_variant(variant, quote!(#name, &[ #(#args),* ]), field_len);
             }
@@ -438,6 +480,10 @@ fn generate_impls(reflect_enum: &ReflectEnum, ref_index: &Ident, ref_name: &Iden
                     }
                 });
 
+                enum_struct_variant_diff.push(
+                    get_apply_diff_impl(variant, &unit, ref_diff, &bevy_reflect_path).unwrap(),
+                );
+
                 let field_len = args.len();
                 push_variant(variant, quote!(#name, &[ #(#args),* ]), field_len);
             }
@@ -454,5 +500,113 @@ fn generate_impls(reflect_enum: &ReflectEnum, ref_index: &Ident, ref_name: &Iden
         enum_variant_name,
         enum_variant_index,
         enum_variant_type,
+        enum_tuple_variant_diff,
+        enum_struct_variant_diff,
+    }
+}
+
+fn get_apply_diff_impl(
+    variant: &EnumVariant,
+    unit: &proc_macro2::TokenStream,
+    ref_diff: &Ident,
+    bevy_reflect_path: &Path,
+) -> Option<proc_macro2::TokenStream> {
+    if matches!(variant.fields, EnumVariantFields::Unit) {
+        // Unit variants are always handled by the `EnumDiff::Swapped`
+        return None;
+    }
+
+    match &variant.fields {
+        EnumVariantFields::Named(_) => {
+            let (active_names, active_idents): (Vec<_>, Vec<_>) = variant
+                .active_fields()
+                .map(|field| {
+                    (
+                        field.data.ident.as_ref().unwrap().to_string(),
+                        field.data.ident.as_ref().unwrap(),
+                    )
+                })
+                .unzip();
+            let ignored_idents = variant
+                .ignored_fields()
+                .map(|field| {
+                    field
+                        .data
+                        .ident
+                        .as_ref()
+                        .map(|ident| ident.clone())
+                        .unwrap_or_else(|| format_ident!("field__{}", field.index))
+                })
+                .collect::<Vec<_>>();
+
+            Some(quote! {
+                #unit { #(#active_idents,)* #(#ignored_idents,)* } => {
+                    let mut change_map = #ref_diff.take_changes();
+
+                    Ok(Box::new(#unit {
+                        #(
+                            #active_idents: #bevy_reflect_path::FromReflect::from_reflect(
+                                    change_map
+                                        .remove(#active_names)
+                                        .ok_or(#bevy_reflect_path::diff::DiffApplyError::MissingField)?
+                                        .apply(Box::new(#active_idents))?
+                                        .as_ref()
+                                ).ok_or(#bevy_reflect_path::diff::DiffApplyError::TypeMismatch)?,
+                        )*
+                        #(#ignored_idents,)*
+                    }))
+                }
+            })
+        }
+        EnumVariantFields::Unnamed(_) => {
+            let (active_indexes, active_idents): (Vec<_>, Vec<_>) = variant
+                .active_fields()
+                .map(|field| {
+                    (
+                        syn::Index::from(field.index),
+                        field
+                            .data
+                            .ident
+                            .as_ref()
+                            .map(|ident| ident.clone())
+                            .unwrap_or_else(|| format_ident!("field__{}", field.index)),
+                    )
+                })
+                .unzip();
+            let (ignored_indexes, ignored_idents): (Vec<_>, Vec<_>) = variant
+                .ignored_fields()
+                .map(|field| {
+                    (
+                        syn::Index::from(field.index),
+                        field
+                            .data
+                            .ident
+                            .as_ref()
+                            .map(|ident| ident.clone())
+                            .unwrap_or_else(|| format_ident!("field__{}", field.index)),
+                    )
+                })
+                .unzip();
+            Some(quote! {
+                #unit { #(#active_indexes: #active_idents,)* #(#ignored_indexes: #ignored_idents,)* } => {
+                    let mut change_list = #ref_diff.take_changes();
+                    change_list.reverse();
+
+                    Ok(Box::new(#unit {
+                        #(
+                            #active_indexes: #bevy_reflect_path::FromReflect::from_reflect(
+                                    change_list
+                                        .pop()
+                                        .ok_or(#bevy_reflect_path::diff::DiffApplyError::MissingField)?
+                                        .apply(Box::new(#active_idents))?
+                                        .as_ref()
+                                ).ok_or(#bevy_reflect_path::diff::DiffApplyError::TypeMismatch)?,
+                        )*
+                        #(#ignored_indexes: #ignored_idents,)*
+                    }))
+                }
+            })
+        }
+        _ => unreachable!("already checked for unit type"),
     }
 }

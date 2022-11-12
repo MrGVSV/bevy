@@ -41,6 +41,11 @@ impl<'old, 'new> DiffedMap<'old, 'new> {
     pub fn iter_changes(&self) -> Iter<'_, MapDiff<'old, 'new>> {
         self.changes.iter()
     }
+
+    /// Take the changes contained in this diff.
+    pub fn take_changes(self) -> Vec<MapDiff<'old, 'new>> {
+        self.changes
+    }
 }
 
 impl<'old, 'new> Debug for DiffedMap<'old, 'new> {

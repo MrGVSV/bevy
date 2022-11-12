@@ -8,7 +8,7 @@ use std::{
     fmt::Debug,
 };
 
-use crate::diff::{Diff, DiffError, DiffResult, DiffType, ValueDiff};
+use crate::diff::{Diff, DiffApplyError, DiffError, DiffResult, DiffType, ValueDiff};
 use crate::utility::NonGenericTypeInfoCell;
 pub use bevy_utils::AHasher as ReflectHasher;
 
@@ -191,6 +191,14 @@ pub trait Reflect: Any + Send + Sync {
             Some(false) => Ok(Diff::Modified(DiffType::Value(ValueDiff::Borrowed(other)))),
             None => Err(DiffError::Incomparable),
         }
+    }
+
+    /// Apply the given [`Diff`] to this value.
+    ///
+    /// If successful, this will return the updated value.
+    /// Otherwise, this will return a [`DiffApplyError`].
+    fn apply_diff(self: Box<Self>, diff: Diff) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        diff.apply(self.into_reflect())
     }
 
     /// Returns a hash of the value (which includes the type).

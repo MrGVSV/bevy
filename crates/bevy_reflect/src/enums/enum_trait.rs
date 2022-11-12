@@ -1,3 +1,4 @@
+use crate::diff::{DiffApplyError, EnumDiff};
 use crate::{DynamicEnum, Reflect, VariantInfo, VariantType};
 use bevy_utils::HashMap;
 use std::any::{Any, TypeId};
@@ -127,6 +128,13 @@ pub trait Enum: Reflect {
     fn variant_path(&self) -> String {
         format!("{}::{}", self.type_name(), self.variant_name())
     }
+
+    /// Apply the given [`EnumDiff`] to this value.
+    ///
+    /// If successful, this will return the updated value.
+    /// Otherwise, this will return a [`DiffApplyError`].
+    fn apply_enum_diff(self: Box<Self>, diff: EnumDiff)
+        -> Result<Box<dyn Reflect>, DiffApplyError>;
 }
 
 /// A container for compile-time enum info, used by [`TypeInfo`](crate::TypeInfo).

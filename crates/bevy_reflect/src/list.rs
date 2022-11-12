@@ -1,7 +1,9 @@
 use std::any::{Any, TypeId};
 use std::fmt::{Debug, Formatter};
 
-use crate::diff::{diff_list, DiffResult};
+use crate::diff::{
+    diff_list, DiffApplyError, DiffResult, DiffedArray, DiffedList, ListDiff, ValueDiff,
+};
 use crate::utility::NonGenericTypeInfoCell;
 use crate::{
     Array, ArrayIter, DynamicArray, DynamicInfo, FromReflect, Reflect, ReflectMut, ReflectOwned,
@@ -26,6 +28,15 @@ pub trait List: Reflect + Array {
             values: self.iter().map(|value| value.clone_value()).collect(),
         }
     }
+
+    /// Apply the given [`DiffedList`] to this value.
+    ///
+    /// If successful, this will return the updated value.
+    /// Otherwise, this will return a [`DiffApplyError`].
+    fn apply_list_diff(
+        self: Box<Self>,
+        diff: DiffedList,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError>;
 }
 
 /// A container for compile-time list info.
@@ -168,6 +179,13 @@ impl Array for DynamicList {
                 .collect(),
         }
     }
+
+    fn apply_array_diff(
+        self: Box<Self>,
+        _diff: DiffedArray,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        Err(DiffApplyError::ExpectedList)
+    }
 }
 
 impl List for DynamicList {
@@ -188,6 +206,64 @@ impl List for DynamicList {
                 .map(|value| value.clone_value())
                 .collect(),
         }
+    }
+
+    fn apply_list_diff(
+        mut self: Box<Self>,
+        diff: DiffedList,
+    ) -> Result<Box<dyn Reflect>, DiffApplyError> {
+        if self.type_name() != diff.type_name() {
+            return Err(DiffApplyError::TypeMismatch);
+        }
+
+        let new_len = (self.len() + diff.total_insertions()) - diff.total_deletions();
+        let mut new = Vec::with_capacity(new_len);
+
+        let mut changes = diff.take_changes();
+        changes.reverse();
+
+        fn has_change(changes: &[ListDiff], index: usize) -> bool {
+            changes
+                .last()
+                .map(|change| change.index() == index)
+                .unwrap_or_default()
+        }
+
+        fn insert(
+            value: ValueDiff,
+            list: &mut Vec<Box<dyn Reflect>>,
+        ) -> Result<(), DiffApplyError> {
+            match value {
+                ValueDiff::Borrowed(value) => list.push(value.clone_value()),
+                ValueDiff::Owned(value) => list.push(value),
+            }
+
+            Ok(())
+        }
+
+        'outer: for (curr_index, element) in self.values.into_iter().enumerate() {
+            while has_change(&changes, curr_index) {
+                match changes.pop().unwrap() {
+                    ListDiff::Deleted(_) => {
+                        continue 'outer;
+                    }
+                    ListDiff::Inserted(_, value) => {
+                        insert(value, &mut new)?;
+                    }
+                }
+            }
+
+            new.push(element);
+        }
+
+        // Insert any remaining elements
+        while let Some(ListDiff::Inserted(_, value)) = changes.pop() {
+            insert(value, &mut new)?;
+        }
+
+        self.values = new;
+
+        Ok(self)
     }
 }
 

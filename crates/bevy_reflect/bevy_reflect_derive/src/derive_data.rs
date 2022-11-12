@@ -411,3 +411,29 @@ impl<'a> ReflectEnum<'a> {
         &self.variants
     }
 }
+
+impl<'a> EnumVariant<'a> {
+    /// Get an iterator of fields which are exposed to the reflection API
+    pub fn active_fields(&self) -> impl Iterator<Item = &StructField<'a>> {
+        self.fields()
+            .iter()
+            .filter(move |field| field.attrs.ignore.is_active())
+    }
+
+    /// Get an iterator of fields which are ignored by the reflection API
+    pub fn ignored_fields(&self) -> impl Iterator<Item = &StructField<'a>> {
+        self.fields()
+            .iter()
+            .filter(move |field| field.attrs.ignore.is_ignored())
+    }
+
+    /// The complete set of fields in this variant.
+    #[allow(dead_code)]
+    pub fn fields(&self) -> &[StructField<'a>] {
+        match &self.fields {
+            EnumVariantFields::Named(fields) => fields,
+            EnumVariantFields::Unnamed(fields) => fields,
+            EnumVariantFields::Unit => &[],
+        }
+    }
+}

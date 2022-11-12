@@ -37,6 +37,11 @@ impl<'old, 'new> DiffedArray<'old, 'new> {
     pub fn iter(&self) -> Iter<'_, Diff<'old, 'new>> {
         self.elements.iter()
     }
+
+    /// Take the changes contained in this diff.
+    pub fn take_changes(self) -> Vec<Diff<'old, 'new>> {
+        self.elements
+    }
 }
 
 impl<'old, 'new> Debug for DiffedArray<'old, 'new> {
