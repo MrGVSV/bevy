@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["accesskit"],"struct":["AccessibilityNode","AccessibilityPlugin","AccessibilityRequested","Focus"],"trait":["AccessKitEntityExt"]};

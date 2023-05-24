@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["DynamicScene","DynamicSceneBuilder","DynamicSceneBundle","Scene","SceneBundle","SceneSpawner"]};
