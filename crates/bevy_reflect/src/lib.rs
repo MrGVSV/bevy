@@ -223,7 +223,7 @@
 //!
 //! Fields can be given default values for when a field is missing in the passed value or even ignored.
 //! Ignored fields must either implement [`Default`] or have a default function specified
-//! using `#[reflect(default = "path::to::function")]`.
+//! using `#[reflect(default = path::to::function)]`.
 //!
 //! See the [derive macro documentation](derive@crate::FromReflect) for details.
 //!
@@ -772,7 +772,7 @@ mod tests {
             foo: String,
 
             // Use `get_bar_default()`
-            #[reflect(ignore, default = "get_bar_default")]
+            #[reflect(ignore, default = get_bar_default)]
             bar: NotReflect,
         }
 
@@ -800,7 +800,7 @@ mod tests {
         enum MyEnum {
             Foo(#[reflect(default)] String),
             Bar {
-                #[reflect(default = "get_baz_default")]
+                #[reflect(default = get_baz_default)]
                 #[reflect(ignore)]
                 baz: usize,
             },
