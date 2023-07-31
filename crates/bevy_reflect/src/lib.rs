@@ -772,18 +772,20 @@ mod tests {
             foo: String,
 
             // Use `get_bar_default()`
-            #[reflect(default = "get_bar_default")]
-            #[reflect(ignore)]
-            bar: usize,
+            #[reflect(ignore, default = "get_bar_default")]
+            bar: NotReflect,
         }
 
-        fn get_bar_default() -> usize {
-            123
+        #[derive(Eq, PartialEq, Debug)]
+        struct NotReflect(usize);
+
+        fn get_bar_default() -> NotReflect {
+            NotReflect(123)
         }
 
         let expected = MyStruct {
             foo: String::default(),
-            bar: 123,
+            bar: NotReflect(123),
         };
 
         let dyn_struct = DynamicStruct::default();
