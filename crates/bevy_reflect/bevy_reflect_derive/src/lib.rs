@@ -245,7 +245,7 @@ pub fn derive_from_reflect(input: TokenStream) -> TokenStream {
         ReflectDerive::Enum(meta) => from_reflect::impl_enum(&meta),
         ReflectDerive::Value(meta) => from_reflect::impl_value(&meta),
     }
-    .into()
+        .into()
 }
 
 /// Derives the `TypePath` trait, providing a stable alternative to [`std::any::type_name`].
@@ -276,7 +276,7 @@ pub fn derive_type_path(input: TokenStream) -> TokenStream {
         // Use `WhereClauseOptions::new_value` here so we don't enforce reflection bounds
         &WhereClauseOptions::new_value(derive_data.meta()),
     )
-    .into()
+        .into()
 }
 
 // From https://github.com/randomPoison/type-uuid
@@ -388,7 +388,7 @@ pub fn impl_reflect_value(input: TokenStream) -> TokenStream {
     let meta = ReflectMeta::new(type_path, def.traits.unwrap_or_default());
 
     #[cfg(feature = "documentation")]
-    let meta = meta.with_docs(documentation::Documentation::from_attributes(&def.attrs));
+        let meta = meta.with_docs(documentation::Documentation::from_attributes(&def.attrs));
 
     let reflect_impls = impls::impl_value(&meta);
     let from_reflect_impl = from_reflect::impl_value(&meta);
@@ -462,14 +462,14 @@ pub fn impl_reflect_struct(input: TokenStream) -> TokenStream {
             ast.span(),
             "impl_reflect_struct does not support tuple structs",
         )
-        .into_compile_error()
-        .into(),
+            .into_compile_error()
+            .into(),
         ReflectDerive::UnitStruct(..) => syn::Error::new(
             ast.span(),
             "impl_reflect_struct does not support unit structs",
         )
-        .into_compile_error()
-        .into(),
+            .into_compile_error()
+            .into(),
         _ => syn::Error::new(ast.span(), "impl_reflect_struct only supports structs")
             .into_compile_error()
             .into(),
