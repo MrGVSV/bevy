@@ -2,7 +2,7 @@ use crate::container_attributes::ReflectTraits;
 use crate::type_path::CustomPathDef;
 use syn::parse::{Parse, ParseStream};
 use syn::token::Paren;
-use syn::{parenthesized, Attribute, Generics, Path};
+use syn::{parenthesized, parse_quote, Attribute, Generics, MacroDelimiter, MetaList, Path};
 
 /// A struct used to define a simple reflected value type (such as primitives).
 ///
@@ -46,7 +46,15 @@ impl Parse for ReflectValueDef {
         if input.peek(Paren) {
             let content;
             parenthesized!(content in input);
-            traits = Some(content.parse::<ReflectTraits>()?);
+
+            let list = MetaList {
+                path: parse_quote!(reflect_value),
+                delimiter: MacroDelimiter::Paren(Paren::default()),
+                tokens: content.parse()?,
+            };
+
+            traits = Some(ReflectTraits::default());
+            list.parse_nested_meta(|meta| traits.as_mut().unwrap().with_nested_meta(meta, false))?;
         }
         Ok(ReflectValueDef {
             attrs,

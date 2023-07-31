@@ -9,11 +9,10 @@ use crate::fq_std::{FQAny, FQOption};
 use crate::utility;
 use proc_macro2::{Ident, Span};
 use quote::quote_spanned;
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
+use syn::meta::ParseNestedMeta;
 use syn::spanned::Spanned;
-use syn::token::Comma;
-use syn::{LitBool, Meta, Path};
+use syn::token::Paren;
+use syn::{Attribute, LitBool, Path};
 
 // The "special" trait idents that are used internally for reflection.
 // Received via attributes like `#[reflect(PartialEq, Hash, ...)]`
@@ -42,7 +41,7 @@ pub(crate) enum TraitImpl {
     Implemented(Span),
 
     /// The trait is registered with a custom function rather than an actual implementation.
-    Custom(Path, Span),
+    Custom(Path),
 }
 
 impl TraitImpl {
@@ -58,8 +57,11 @@ impl TraitImpl {
                 Ok(())
             }
             (_, TraitImpl::NotImplemented) => Ok(()),
-            (_, TraitImpl::Implemented(span) | TraitImpl::Custom(_, span)) => {
+            (_, TraitImpl::Implemented(span)) => {
                 Err(syn::Error::new(span, CONFLICTING_TYPE_DATA_MESSAGE))
+            }
+            (_, TraitImpl::Custom(path)) => {
+                Err(syn::Error::new_spanned(path, CONFLICTING_TYPE_DATA_MESSAGE))
             }
         }
     }
@@ -170,107 +172,64 @@ pub(crate) struct ReflectTraits {
 }
 
 impl ReflectTraits {
-    pub fn from_metas(
-        metas: Punctuated<Meta, Comma>,
+    pub fn with_attr(
+        &mut self,
+        attr: &Attribute,
         is_from_reflect_derive: bool,
-    ) -> Result<Self, syn::Error> {
-        let mut traits = ReflectTraits::default();
-        for meta in &metas {
-            match meta {
-                // Handles `#[reflect( Hash, Default, ... )]`
-                Meta::Path(path) => {
-                    // Get the first ident in the path (hopefully the path only contains one and not `std::hash::Hash`)
-                    let Some(segment) = path.segments.iter().next() else {
-                        continue;
-                    };
-                    let ident = &segment.ident;
-                    let ident_name = ident.to_string();
+    ) -> Result<(), syn::Error> {
+        attr.parse_nested_meta(|meta| self.with_nested_meta(meta, is_from_reflect_derive))
+    }
 
-                    // Track the span where the trait is implemented for future errors
-                    let span = ident.span();
-
-                    match ident_name.as_str() {
-                        DEBUG_ATTR => {
-                            traits.debug.merge(TraitImpl::Implemented(span))?;
-                        }
-                        PARTIAL_EQ_ATTR => {
-                            traits.partial_eq.merge(TraitImpl::Implemented(span))?;
-                        }
-                        HASH_ATTR => {
-                            traits.hash.merge(TraitImpl::Implemented(span))?;
-                        }
-                        // We only track reflected idents for traits not considered special
-                        _ => {
-                            // Create the reflect ident
-                            // We set the span to the old ident so any compile errors point to that ident instead
-                            let mut reflect_ident = utility::get_reflect_ident(&ident_name);
-                            reflect_ident.set_span(span);
-
-                            add_unique_ident(&mut traits.idents, reflect_ident)?;
-                        }
-                    }
-                }
-                // Handles `#[reflect( Hash(custom_hash_fn) )]`
-                Meta::List(list) => {
-                    // Get the first ident in the path (hopefully the path only contains one and not `std::hash::Hash`)
-                    let Some(segment) = list.path.segments.iter().next() else {
-                        continue;
-                    };
-
-                    let ident = segment.ident.to_string();
-
-                    // Track the span where the trait is implemented for future errors
-                    let span = ident.span();
-
-                    list.parse_nested_meta(|meta| {
-                        // This should be the path of the custom function
-                        let trait_func_ident = TraitImpl::Custom(meta.path, span);
-                        match ident.as_str() {
-                            DEBUG_ATTR => {
-                                traits.debug.merge(trait_func_ident)?;
-                            }
-                            PARTIAL_EQ_ATTR => {
-                                traits.partial_eq.merge(trait_func_ident)?;
-                            }
-                            HASH_ATTR => {
-                                traits.hash.merge(trait_func_ident)?;
-                            }
-                            _ => {
-                                return Err(syn::Error::new(span, "Can only use custom functions for special traits (i.e. `Hash`, `PartialEq`, `Debug`)"));
-                            }
-                        }
-                        Ok(())
-                    })?;
-                }
-                Meta::NameValue(pair) => {
-                    if pair.path.is_ident(FROM_REFLECT_ATTR) {
-                        traits.from_reflect.auto_derive = match &pair.value {
-                            syn::Expr::Lit(syn::ExprLit {
-                                lit: syn::Lit::Bool(lit),
-                                ..
-                            }) => {
-                                // Override `lit` if this is a `FromReflect` derive.
-                                // This typically means a user is opting out of the default implementation
-                                // from the `Reflect` derive and using the `FromReflect` derive directly instead.
-                                is_from_reflect_derive
-                                    .then(|| LitBool::new(true, Span::call_site()))
-                                    .or_else(|| Some(lit.clone()))
-                            }
-                            _ => {
-                                return Err(syn::Error::new(
-                                    pair.value.span(),
-                                    "Expected a boolean value",
-                                ))
-                            }
-                        };
-                    } else {
-                        return Err(syn::Error::new(pair.path.span(), "Unknown attribute"));
-                    }
-                }
+    pub fn with_nested_meta(
+        &mut self,
+        meta: ParseNestedMeta,
+        is_from_reflect_derive: bool,
+    ) -> Result<(), syn::Error> {
+        if meta.path.is_ident(HASH_ATTR) {
+            if meta.input.peek(Paren) {
+                meta.parse_nested_meta(|meta| self.hash.merge(TraitImpl::Custom(meta.path)))
+            } else {
+                self.hash.merge(TraitImpl::Implemented(meta.path.span()))
             }
-        }
+        } else if meta.path.is_ident(PARTIAL_EQ_ATTR) {
+            if meta.input.peek(Paren) {
+                meta.parse_nested_meta(|meta| self.partial_eq.merge(TraitImpl::Custom(meta.path)))
+            } else {
+                self.partial_eq
+                    .merge(TraitImpl::Implemented(meta.path.span()))
+            }
+        } else if meta.path.is_ident(DEBUG_ATTR) {
+            if meta.input.peek(Paren) {
+                meta.parse_nested_meta(|meta| self.debug.merge(TraitImpl::Custom(meta.path)))
+            } else {
+                self.debug.merge(TraitImpl::Implemented(meta.path.span()))
+            }
+        } else if meta.path.is_ident(FROM_REFLECT_ATTR) {
+            let from_reflect = FromReflectAttrs {
+                auto_derive: if is_from_reflect_derive {
+                    Some(LitBool::new(true, Span::call_site()))
+                } else {
+                    Some(meta.value()?.parse()?)
+                },
+            };
 
-        Ok(traits)
+            self.from_reflect.merge(from_reflect)
+        } else {
+            // We only track reflected idents for traits not considered special.
+            if meta.path.segments.len() != 1 {
+                return Err(meta.error("expected single identifier"));
+            }
+            let ident = &meta.path.segments.last().unwrap().ident;
+            let ident_name = ident.to_string();
+
+            // Create the reflect ident
+            // We set the span to the old ident so any compile errors point to that ident instead
+            let mut reflect_ident = utility::get_reflect_ident(&ident_name);
+            reflect_ident.set_span(ident.span());
+
+            add_unique_ident(&mut self.idents, reflect_ident)?;
+            Ok(())
+        }
     }
 
     /// Returns true if the given reflected trait name (i.e. `ReflectDefault` for `Default`)
@@ -304,11 +263,14 @@ impl ReflectTraits {
                     #FQOption::Some(Hasher::finish(&hasher))
                 }
             }),
-            &TraitImpl::Custom(ref impl_fn, span) => Some(quote_spanned! {span=>
-                fn reflect_hash(&self) -> #FQOption<u64> {
-                    #FQOption::Some(#impl_fn(self))
-                }
-            }),
+            TraitImpl::Custom(ref impl_fn) => {
+                let span = impl_fn.span();
+                Some(quote_spanned! {span=>
+                    fn reflect_hash(&self) -> #FQOption<u64> {
+                        #FQOption::Some(#impl_fn(self))
+                    }
+                })
+            }
             TraitImpl::NotImplemented => None,
         }
     }
@@ -331,11 +293,14 @@ impl ReflectTraits {
                     }
                 }
             }),
-            &TraitImpl::Custom(ref impl_fn, span) => Some(quote_spanned! {span=>
-                fn reflect_partial_eq(&self, value: &dyn #bevy_reflect_path::Reflect) -> #FQOption<bool> {
-                    #FQOption::Some(#impl_fn(self, value))
-                }
-            }),
+            TraitImpl::Custom(ref impl_fn) => {
+                let span = impl_fn.span();
+                Some(quote_spanned! {span=>
+                    fn reflect_partial_eq(&self, value: &dyn #bevy_reflect_path::Reflect) -> #FQOption<bool> {
+                        #FQOption::Some(#impl_fn(self, value))
+                    }
+                })
+            }
             TraitImpl::NotImplemented => None,
         }
     }
@@ -350,33 +315,16 @@ impl ReflectTraits {
                     ::core::fmt::Debug::fmt(self, f)
                 }
             }),
-            &TraitImpl::Custom(ref impl_fn, span) => Some(quote_spanned! {span=>
-                fn debug(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                    #impl_fn(self, f)
-                }
-            }),
+            TraitImpl::Custom(ref impl_fn) => {
+                let span = impl_fn.span();
+                Some(quote_spanned! {span=>
+                    fn debug(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                        #impl_fn(self, f)
+                    }
+                })
+            }
             TraitImpl::NotImplemented => None,
         }
-    }
-
-    /// Merges the trait implementations of this [`ReflectTraits`] with another one.
-    ///
-    /// An error is returned if the two [`ReflectTraits`] have conflicting implementations.
-    pub fn merge(&mut self, other: ReflectTraits) -> Result<(), syn::Error> {
-        self.debug.merge(other.debug)?;
-        self.hash.merge(other.hash)?;
-        self.partial_eq.merge(other.partial_eq)?;
-        self.from_reflect.merge(other.from_reflect)?;
-        for ident in other.idents {
-            add_unique_ident(&mut self.idents, ident)?;
-        }
-        Ok(())
-    }
-}
-
-impl Parse for ReflectTraits {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        ReflectTraits::from_metas(Punctuated::<Meta, Comma>::parse_terminated(input)?, false)
     }
 }
 
