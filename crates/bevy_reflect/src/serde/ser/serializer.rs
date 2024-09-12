@@ -154,14 +154,9 @@ impl<'a> Serialize for TypedReflectSerializer<'a> {
     {
         #[cfg(feature = "debug_stack")]
         {
-            let info = self.value.get_represented_type_info().ok_or_else(|| {
-                make_custom_error(format_args!(
-                    "type `{}` does not represent any type",
-                    self.value.reflect_type_path(),
-                ))
-            })?;
-
-            TYPE_INFO_STACK.with_borrow_mut(|stack| stack.push(info));
+            if let Some(info) = self.value.get_represented_type_info() {
+                TYPE_INFO_STACK.with_borrow_mut(|stack| stack.push(info));
+            }
         }
 
         // Handle both Value case and types that have a custom `Serialize`
