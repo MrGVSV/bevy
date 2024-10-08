@@ -1,5 +1,5 @@
 use crate as bevy_reflect;
-use crate::std_traits::ReflectDefault;
+use crate::{std_traits::ReflectDefault, ReflectDeserialize, ReflectSerialize};
 use assert_type_match::assert_type_match;
 use bevy_reflect_derive::{impl_reflect, impl_reflect_opaque};
 use glam::*;
@@ -373,8 +373,8 @@ reflect_enum!(
     }
 );
 
-impl_reflect_opaque!(::glam::BVec3A(Debug, Default));
-impl_reflect_opaque!(::glam::BVec4A(Debug, Default));
+impl_reflect_opaque!(::glam::BVec3A(Debug, Default, Deserialize, Serialize));
+impl_reflect_opaque!(::glam::BVec4A(Debug, Default, Deserialize, Serialize));
 
 #[cfg(test)]
 mod tests {
