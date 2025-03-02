@@ -17,8 +17,8 @@ pub enum ReflectCloneError {
     /// This type should be returned when a type is intentionally opting out of reflection cloning.
     ///
     /// [`Reflect::reflect_clone`]: crate::Reflect::reflect_clone
-    #[error("`{type_path}` cannot be made clonable for `Reflect::reflect_clone`")]
-    NotClonable { type_path: Cow<'static, str> },
+    #[error("`{type_path}` cannot be made cloneable for `Reflect::reflect_clone`")]
+    NotCloneable { type_path: Cow<'static, str> },
     /// The field cannot be cloned via [`Reflect::reflect_clone`].
     ///
     /// When [deriving `Reflect`], this usually means that a field marked with `#[reflect(ignore)]`
@@ -29,10 +29,10 @@ pub enum ReflectCloneError {
     /// [`Reflect::reflect_clone`]: crate::Reflect::reflect_clone
     /// [deriving `Reflect`]: derive@crate::Reflect
     #[error(
-        "field `{}` cannot be made clonable for `Reflect::reflect_clone` (are you missing a `#[reflect(clone)]` attribute?)",
+        "field `{}` cannot be made cloneable for `Reflect::reflect_clone` (are you missing a `#[reflect(clone)]` attribute?)",
         full_path(.field, .variant.as_deref(), .container_type_path)
     )]
-    FieldNotClonable {
+    FieldNotCloneable {
         field: FieldId,
         variant: Option<Cow<'static, str>>,
         container_type_path: Cow<'static, str>,
