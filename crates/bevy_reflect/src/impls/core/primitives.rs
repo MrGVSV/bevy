@@ -6,8 +6,7 @@ use crate::{
     reflect::ApplyError,
     type_info::{MaybeTyped, OpaqueInfo, TypeInfo, Typed},
     type_registry::{
-        GetTypeRegistration, ReflectDeserialize, ReflectFromPtr, ReflectSerialize,
-        TypeRegistration, TypeRegistry,
+        GetTypeRegistration, ReflectDeserialize, ReflectFromPtr, ReflectSerialize, TypeRegistration,
     },
     utility::{reflect_hasher, GenericTypeInfoCell, GenericTypePathCell, NonGenericTypeInfoCell},
 };
@@ -639,11 +638,9 @@ impl<T: Reflect + MaybeTyped + TypePath + GetTypeRegistration, const N: usize> G
     for [T; N]
 {
     fn get_type_registration() -> TypeRegistration {
-        TypeRegistration::of::<[T; N]>()
-    }
-
-    fn register_type_dependencies(registry: &mut TypeRegistry) {
-        registry.register::<T>();
+        TypeRegistration::of::<[T; N]>().on_register(|registry| {
+            registry.register::<T>();
+        })
     }
 }
 

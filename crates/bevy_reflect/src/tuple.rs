@@ -8,8 +8,8 @@ use crate::generics::impl_generic_info_methods;
 use crate::{
     type_info::impl_type_methods, utility::GenericTypePathCell, ApplyError, FromReflect, Generics,
     GetTypeRegistration, MaybeTyped, PartialReflect, Reflect, ReflectCloneError, ReflectKind,
-    ReflectMut, ReflectOwned, ReflectRef, Type, TypeInfo, TypePath, TypeRegistration, TypeRegistry,
-    Typed, UnnamedField,
+    ReflectMut, ReflectOwned, ReflectRef, Type, TypeInfo, TypePath, TypeRegistration, Typed,
+    UnnamedField,
 };
 use alloc::{boxed::Box, vec, vec::Vec};
 use core::{
@@ -667,11 +667,9 @@ macro_rules! impl_reflect_tuple {
 
         impl<$($name: Reflect + MaybeTyped + TypePath + GetTypeRegistration),*> GetTypeRegistration for ($($name,)*) {
             fn get_type_registration() -> TypeRegistration {
-                TypeRegistration::of::<($($name,)*)>()
-            }
-
-            fn register_type_dependencies(_registry: &mut TypeRegistry) {
-                $(_registry.register::<$name>();)*
+                TypeRegistration::of::<($($name,)*)>().on_register(|_registry| {
+                    $(_registry.register::<$name>();)*
+                })
             }
         }
 

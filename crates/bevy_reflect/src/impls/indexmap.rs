@@ -8,7 +8,7 @@ use crate::{
 use bevy_platform::prelude::{Box, Vec};
 use bevy_reflect::{
     map::{DynamicMap, Map, MapInfo},
-    MaybeTyped, ReflectFromReflect, ReflectKind, TypeRegistry, Typed,
+    MaybeTyped, ReflectFromReflect, ReflectKind, Typed,
 };
 use bevy_reflect_derive::impl_type_path;
 use core::{any::Any, hash::BuildHasher, hash::Hash};
@@ -268,11 +268,10 @@ where
         TypeRegistration::of::<Self>()
             .register_type_data::<ReflectFromPtr, Self>()
             .register_type_data::<ReflectFromReflect, Self>()
-    }
-
-    fn register_type_dependencies(registry: &mut TypeRegistry) {
-        registry.register::<K>();
-        registry.register::<V>();
+            .on_register(|registry| {
+                registry.register::<K>();
+                registry.register::<V>();
+            })
     }
 }
 
