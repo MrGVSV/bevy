@@ -81,6 +81,10 @@ pub trait GetTypeRegistration: 'static {
     ///
     /// This method is called by [`TypeRegistry::register`] to register any other required types.
     /// Often, this is done for fields of structs and enum variants to ensure all types are properly registered.
+    #[deprecated(
+        since = "0.20.0",
+        note = "This function will be removed in a future release. Please use `TypeRegistration::on_register` instead."
+    )]
     fn register_type_dependencies(_registry: &mut TypeRegistry) {}
 }
 
@@ -205,6 +209,10 @@ impl TypeRegistry {
         T: GetTypeRegistration,
     {
         if self.register_internal(TypeId::of::<T>(), T::get_type_registration, false) {
+            #[expect(
+                deprecated,
+                reason = "will continue to use `GetTypeRegistration::register_type_dependencies` until fully removed"
+            )]
             T::register_type_dependencies(self);
         }
     }
@@ -302,8 +310,13 @@ impl TypeRegistry {
         );
 
         let callbacks = registration.flush_on_register_callbacks();
+        let on_register = registration.on_register.take();
 
         self.registrations.insert(type_id, registration);
+
+        if let Some(on_register) = on_register {
+            on_register(self);
+        }
 
         for callback in callbacks {
             callback.call(self);
@@ -898,6 +911,7 @@ macro_rules! type_data_insertion_methods {
 pub struct TypeRegistration {
     data: TypeIdMap<Box<dyn TypeData>>,
     type_info: &'static TypeInfo,
+    on_register: Option<Box<dyn FnOnce(&mut TypeRegistry) + Send + Sync + 'static>>,
     /// The `on_register` callbacks waiting to be applied.
     ///
     /// These are generally the ones from [`CreateTypeData::on_register`]
@@ -921,12 +935,106 @@ impl Debug for TypeRegistration {
 
 impl TypeRegistration {
     /// Creates type registration information for `T`.
+    ///
+    /// Note that this creates an empty type registration for `T`.
+    /// To ensure all dependencies and type data are registered for `T`,
+    /// it's recommended to use [`GetTypeRegistration::get_type_registration`] instead.
     pub fn of<T: Reflect + Typed + TypePath>() -> Self {
         Self {
             data: Default::default(),
             type_info: T::type_info(),
             pending_callbacks: None,
+            on_register: None,
         }
+    }
+
+    /// Register a callback for when this [`TypeRegistration`] is registered into a [`TypeRegistry`].
+    ///
+    /// This can be used to register type dependencies or perform other registry logic.
+    ///
+    /// If a callback was already defined, a new closure will be defined that first runs the existing
+    /// callback followed by the new callback, `f`.
+    /// This is generally what you want if the registration was returned by something like [`GetTypeRegistration::get_type_registration`].
+    /// However, if you need to completely replace the existing callback, if any, see [`Self::replace_on_register`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use core::any::TypeId;
+    /// # use bevy_reflect::{Reflect, TypeRegistration, TypeRegistry};
+    /// #[derive(Reflect)]
+    /// struct MyType;
+    ///
+    /// let registration = TypeRegistration::of::<MyType>()
+    ///   .on_register(|registry| {
+    ///     registry.register::<Option<MyType>>();
+    ///   })
+    ///   // Add another callback in addition to the one above
+    ///   .on_register(|registry| {
+    ///     registry.register::<Vec<MyType>>();
+    ///   });
+    ///
+    /// let mut registry = TypeRegistry::new();
+    /// registry.add_registration(registration);
+    ///
+    /// assert!(registry.contains(TypeId::of::<MyType>()));
+    /// assert!(registry.contains(TypeId::of::<Option<MyType>>()));
+    /// assert!(registry.contains(TypeId::of::<Vec<MyType>>()));
+    /// ```
+    pub fn on_register<F: FnOnce(&mut TypeRegistry) + Send + Sync + 'static>(
+        mut self,
+        f: F,
+    ) -> Self {
+        self.on_register = if let Some(existing) = self.on_register.take() {
+            Some(Box::new(|registry| {
+                existing(registry);
+                f(registry);
+            }))
+        } else {
+            Some(Box::new(f))
+        };
+
+        self
+    }
+
+    /// Register a callback for when this [`TypeRegistration`] is registered into a [`TypeRegistry`].
+    /// If a callback was already defined for this registration, it will be replaced.
+    ///
+    /// This can be used to register type dependencies or perform other registry logic.
+    ///
+    /// In most cases, except where you have manually created the [`TypeRegistration`] using [`TypeRegistration::of`],
+    /// it is preferred to use [`TypeRegistration::on_register`] to preserve existing callback logic.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use core::any::TypeId;
+    /// # use bevy_reflect::{Reflect, TypeRegistration, TypeRegistry};
+    /// #[derive(Reflect)]
+    /// struct MyType;
+    ///
+    /// let registration = TypeRegistration::of::<MyType>()
+    ///   .on_register(|registry| {
+    ///     registry.register::<Option<MyType>>();
+    ///   })
+    ///   // Overwrite the callback above
+    ///   .replace_on_register(|registry| {
+    ///     registry.register::<Vec<MyType>>();
+    ///   });
+    ///
+    /// let mut registry = TypeRegistry::new();
+    /// registry.add_registration(registration);
+    ///
+    /// assert!(registry.contains(TypeId::of::<MyType>()));
+    /// assert!(!registry.contains(TypeId::of::<Option<MyType>>()));
+    /// assert!(registry.contains(TypeId::of::<Vec<MyType>>()));
+    /// ```
+    pub fn replace_on_register<F: FnOnce(&mut TypeRegistry) + Send + Sync + 'static>(
+        mut self,
+        f: F,
+    ) -> Self {
+        self.on_register = Some(Box::new(f));
+        self
     }
 
     /// Inserts an instance of `T` into this registration's [type data].
@@ -1244,7 +1352,7 @@ impl<T: Reflect> CreateTypeData<T> for ReflectFromPtr {
     unsafe_code,
     reason = "We must interact with pointers here, which are inherently unsafe."
 )]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
@@ -1332,5 +1440,63 @@ mod test {
 
         let data = registration.data::<DataA>().unwrap();
         assert_eq!(data.0, 456);
+    }
+
+    #[test]
+    fn should_allow_replacing_on_register() {
+        #[derive(Reflect)]
+        struct MyType;
+
+        #[derive(Reflect)]
+        struct Good;
+
+        #[derive(Reflect)]
+        struct Bad;
+
+        let registration = TypeRegistration::of::<MyType>()
+            // Initial on_register
+            .on_register(|registry| {
+                registry.register::<Bad>();
+            })
+            // New on_register
+            .replace_on_register(|registry| {
+                registry.register::<Good>();
+            });
+
+        let mut registry = TypeRegistry::empty();
+        registry.add_registration(registration);
+
+        assert!(registry.contains(TypeId::of::<MyType>()));
+        assert!(registry.contains(TypeId::of::<Good>()));
+        assert!(!registry.contains(TypeId::of::<Bad>()));
+    }
+
+    #[test]
+    fn should_allow_appending_on_register() {
+        #[derive(Reflect)]
+        struct MyType;
+
+        #[derive(Reflect)]
+        struct One;
+
+        #[derive(Reflect)]
+        struct Two;
+
+        let registration = TypeRegistration::of::<MyType>()
+            // Initial on_register
+            .on_register(|registry| {
+                registry.register::<One>();
+            })
+            // Added on_register
+            .on_register(|registry| {
+                registry.register::<Two>();
+            });
+
+        let mut registry = TypeRegistry::empty();
+        registry.add_registration(registration);
+
+        assert!(registry.contains(TypeId::of::<MyType>()));
+        assert!(registry.contains(TypeId::of::<One>()));
+        assert!(registry.contains(TypeId::of::<Two>()));
     }
 }

@@ -6,8 +6,7 @@ use crate::{
     reflect::{impl_full_reflect, ApplyError},
     type_info::{MaybeTyped, OpaqueInfo, TypeInfo, Typed},
     type_registry::{
-        GetTypeRegistration, ReflectDeserialize, ReflectFromPtr, ReflectSerialize,
-        TypeRegistration, TypeRegistry,
+        GetTypeRegistration, ReflectDeserialize, ReflectFromPtr, ReflectSerialize, TypeRegistration,
     },
     utility::{reflect_hasher, GenericTypeInfoCell, NonGenericTypeInfoCell},
 };
@@ -291,11 +290,9 @@ impl<T: FromReflect + MaybeTyped + Clone + TypePath + GetTypeRegistration> GetTy
     for Cow<'static, [T]>
 {
     fn get_type_registration() -> TypeRegistration {
-        TypeRegistration::of::<Cow<'static, [T]>>()
-    }
-
-    fn register_type_dependencies(registry: &mut TypeRegistry) {
-        registry.register::<T>();
+        TypeRegistration::of::<Cow<'static, [T]>>().on_register(|registry| {
+            registry.register::<T>();
+        })
     }
 }
 

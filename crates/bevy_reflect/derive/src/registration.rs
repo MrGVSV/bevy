@@ -16,10 +16,15 @@ pub(crate) fn impl_get_type_registration<'a>(
 
     let type_deps_fn = type_dependencies.map(|deps| {
         quote! {
-            #[inline(never)]
-            fn register_type_dependencies(registry: &mut #bevy_reflect_path::TypeRegistry) {
-                #(<#deps as #bevy_reflect_path::__macro_exports::RegisterForReflection>::__register(registry);)*
-            }
+            #(<#deps as #bevy_reflect_path::__macro_exports::RegisterForReflection>::__register(registry);)*
+        }
+    });
+
+    let on_register = type_deps_fn.map(|func| {
+        quote! {
+            .on_register(|registry| {
+                #func
+            })
         }
     });
 
@@ -70,9 +75,8 @@ pub(crate) fn impl_get_type_registration<'a>(
                 #from_reflect_data
                 #serialization_data
                 #(#type_data)*
+                #on_register
             }
-
-            #type_deps_fn
         }
     }
 }

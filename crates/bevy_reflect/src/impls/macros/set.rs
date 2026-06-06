@@ -167,10 +167,9 @@ macro_rules! impl_reflect_for_hashset {
                     $crate::type_registry::TypeRegistration::of::<Self>()
                         .register_type_data::<$crate::type_registry::ReflectFromPtr, Self>()
                         .register_type_data::<$crate::from_reflect::ReflectFromReflect, Self>()
-                }
-
-                fn register_type_dependencies(registry: &mut $crate::type_registry::TypeRegistry) {
-                    registry.register::<V>();
+                        .on_register(|registry| {
+                            registry.register::<V>();
+                        })
                 }
             }
 
