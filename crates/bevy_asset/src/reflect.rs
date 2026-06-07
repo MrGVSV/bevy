@@ -1,15 +1,17 @@
 use alloc::{borrow::Cow, boxed::Box, format};
-use core::any::{Any, TypeId};
-use serde::{de::Error as _, ser::Error as _, Deserialize, Deserializer, Serialize};
-use thiserror::Error;
-use tracing::warn;
-use uuid::Uuid;
-
+use bevy_asset::HandleTemplate;
 use bevy_ecs::world::{unsafe_world_cell::UnsafeWorldCell, World};
 use bevy_reflect::{
     serde::{ReflectDeserializerProcessor, ReflectSerializerProcessor},
-    CreateTypeData, FromReflect, PartialReflect, Reflect, TypeData, TypeRegistry,
+    CreateTypeData, FromReflect, OnInsertTypeData, OnRegisterTypeData, PartialReflect, Reflect,
+    TypeData, TypeRegistry,
 };
+use core::any::{Any, TypeId};
+use serde::{de::Error as _, ser::Error as _, Deserialize, Deserializer, Serialize};
+use std::prelude::rust_2015::String;
+use thiserror::Error;
+use tracing::warn;
+use uuid::Uuid;
 
 use crate::{
     Asset, AssetId, AssetPath, AssetServer, Assets, Handle, InvalidGenerationError, LoadContext,
@@ -201,6 +203,13 @@ impl<A: Asset + FromReflect> CreateTypeData<A> for ReflectAsset {
             },
         }
     }
+
+    fn on_register(_: &()) -> Option<OnRegisterTypeData> {
+        Some(OnRegisterTypeData::new(|registry| {
+            registry.register::<Handle<A>>();
+            registry.register_type_data::<Handle<A>, ReflectHandle>();
+        }))
+    }
 }
 
 /// Reflect type data struct relating a [`Handle<T>`] back to the `T` asset type.
@@ -265,6 +274,13 @@ impl<A: Asset> CreateTypeData<Handle<A>> for ReflectHandle {
             typed: |handle: UntypedHandle| Box::new(handle.typed_debug_checked::<A>()),
         }
     }
+
+    fn on_register(_: &()) -> Option<OnRegisterTypeData> {
+        Some(OnRegisterTypeData::new(|registry| {
+            registry.register::<HandleTemplate<A>>();
+            registry.register_type_conversion::<String, HandleTemplate<A>, _>(|s| Ok(s.into()));
+        }))
+    }
 }
 
 /// A [`ReflectSerializerProcessor`] that manually serializes [`Handle`] and [`UntypedHandle`], and
@@ -311,7 +327,8 @@ impl ReflectSerializerProcessor for HandleSerializeProcessor {
         };
 
         #[derive(Error, Debug)]
-        #[error("Attempted to serialize an ephemeral asset handle {0:?} while `EphemeralHandleBehavior::Error` is set")]
+        #[error("Attempted to serialize an ephemeral asset handle {0:?} while `EphemeralHandleBehavior::Error` is set"
+        )]
         struct SerializingEphemeralHandleError(UntypedHandle);
 
         fn handle_reference_from_handle(

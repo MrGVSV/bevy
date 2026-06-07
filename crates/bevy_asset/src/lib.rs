@@ -581,6 +581,11 @@ pub trait AssetApp {
     /// and adds [`ReflectAsset`] type data to `T` and [`ReflectHandle`] type data to [`Handle<T>`] in the type registry.
     ///
     /// This enables reflection code to access assets. For detailed information, see the docs on [`ReflectAsset`] and [`ReflectHandle`].
+    #[deprecated(
+        since = "0.20.0",
+        note = "If your type is marked with `#[reflect(Asset)]` then `App::register_type` now automatically registers all other state reflection types. \
+        Otherwise, register `A` with `App::register_type` and then `ReflectAsset` with `App::register_type_data`"
+    )]
     fn register_asset_reflect<A>(&mut self) -> &mut Self
     where
         A: Asset + Reflect + FromReflect + GetTypeRegistration;
