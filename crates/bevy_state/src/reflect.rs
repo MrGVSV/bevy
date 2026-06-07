@@ -1,7 +1,9 @@
-use crate::state::{FreelyMutableState, NextState, State, States};
+use crate::state::{FreelyMutableState, NextState, PreviousState, State, States};
 
 use bevy_ecs::{reflect::from_reflect_with_fallback, world::World};
-use bevy_reflect::{CreateTypeData, Reflect, TypeData, TypePath, TypeRegistry};
+use bevy_reflect::{
+    CreateTypeData, OnInsertTypeData, OnRegisterTypeData, Reflect, TypeData, TypePath, TypeRegistry,
+};
 
 /// A struct used to operate on the reflected [`States`] trait of a type.
 ///
@@ -44,6 +46,13 @@ impl<S: States + Reflect> CreateTypeData<S> for ReflectState {
                     .map(|res| res.get() as &dyn Reflect)
             },
         })
+    }
+
+    fn on_register(_: &()) -> Option<OnRegisterTypeData> {
+        Some(OnRegisterTypeData::new(|registry| {
+            registry.register_type::<State<S>>();
+            registry.register_type::<PreviousState<S>>();
+        }))
     }
 }
 
@@ -114,6 +123,20 @@ impl<S: FreelyMutableState + Reflect + TypePath> CreateTypeData<S> for ReflectFr
                 }
             },
         })
+    }
+
+    fn on_register(_: &()) -> Option<OnRegisterTypeData> {
+        Some(OnRegisterTypeData::new(|registry| {
+            registry.register_type::<State<S>>();
+            registry.register_type::<PreviousState<S>>();
+            registry.register_type::<NextState<S>>();
+        }))
+    }
+
+    fn on_insert(_: &()) -> Option<OnInsertTypeData> {
+        Some(OnInsertTypeData::new(|mut registration| {
+            registration.register_type_data::<ReflectState, S>();
+        }))
     }
 }
 

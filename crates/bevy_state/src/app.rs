@@ -68,6 +68,11 @@ pub trait AppExtStates {
     /// and adds [`ReflectState`](crate::reflect::ReflectState) type data to `T` in the type registry.
     ///
     /// This enables reflection code to access the state. For detailed information, see the docs on [`crate::reflect::ReflectState`] .
+    #[deprecated(
+        since = "0.20.0",
+        note = "If your type is marked with `#[reflect(State)]` then `App::register_type` now automatically registers all other state reflection types. \
+        Otherwise, register `S` with `App::register_type` and then `ReflectState` with `App::register_type_data`"
+    )]
     fn register_type_state<S>(&mut self) -> &mut Self
     where
         S: States + FromReflect + GetTypeRegistration + Typed;
@@ -78,6 +83,11 @@ pub trait AppExtStates {
     ///
     /// This enables reflection code to access and modify the state.
     /// For detailed information, see the docs on [`crate::reflect::ReflectState`] and [`crate::reflect::ReflectFreelyMutableState`].
+    #[deprecated(
+        since = "0.20.0",
+        note = "If your type is marked with `#[reflect(FreelyMutableState)]` then `App::register_type` now automatically registers all other state reflection types. \
+        Otherwise, register `S` with `App::register_type` and then `ReflectFreelyMutableState` with `App::register_type_data`"
+    )]
     fn register_type_mutable_state<S>(&mut self) -> &mut Self
     where
         S: FreelyMutableState + FromReflect + GetTypeRegistration + Typed;
